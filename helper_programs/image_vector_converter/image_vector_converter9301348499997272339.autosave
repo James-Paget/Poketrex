@@ -1,4 +1,4 @@
-/*
+9/*
 . Program written to allow;
     (A) Manual creation of a vector list (e.g. Place ordered points by hand to provide a vector lines usable 
         by the vectrex; an image can be overlayed behind to essentially 'trace' it)
@@ -380,8 +380,8 @@ void calculateAutoDots() {
             }
             pixelValue /= ( min(height, j+searchRadius)-max(0, j-searchRadius) )*( min(width, i+searchRadius)-max(0, i-searchRadius) );
             float intensity = floor( (max(0, pixelValue-120)) / ((255.0-120.0)/7.0)); // Ranges from 0 to 7, with a cutoff brightness of 120
-            // if(intensity > 0) {      // For varying hues
-            if(pixelValue <= 100.0) {   // For blacks only
+            // if(intensity > 0) {
+            if(pixelValue <= 100.0) {
                 // Change add index so list is ordered in a 'snake-ing' fashion, rather than always restarting back on the left (faster for the vectrex beam)
                 if(floor(j/resolution) % 2 == 0) {
                     dotNodes.add(new PVector(i, j, intensity));     // Add to end => L to R
