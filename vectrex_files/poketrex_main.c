@@ -1,540 +1,342 @@
 #include "vectrex.h"
 #include "vectrex/bios.h"
+#include "poketrex_main.h"
+
+void display_cube(int8_t origin_y, int8_t origin_x, uint8_t radius) {
+  /*
+  . Displays a cube of half-width equal to radius, and centered at the origin
+  */
+  int8_t vector_lines[8] = {    // ** Note; Non-const as lines requires just char[] argument
+    0, 2*radius,    // Top-left, travelling CW
+    -2*radius, 0,
+    0, -2*radius,
+    2*radius, 0,
+  };
+  reset_beam();
+  move(origin_y+radius, origin_x-radius);
+  intensity(0x7f);
+  lines(4, vector_lines);
+};
+void display_rect(int8_t origin_y, int8_t origin_x, uint8_t hheight, uint8_t hwidth) {
+  /*
+  . Displays a rectangle of half-width and height as specified, centered at the origin
+  */
+  int8_t vector_lines[8] = {    // ** Note; Non-const as lines requires just char[] argument
+    0, 2*hwidth,    // Top-left, travelling CW
+    -2*hheight, 0,
+    0, -2*hwidth,
+    2*hheight, 0,
+  };
+  reset_beam();
+  move(origin_y+hheight, origin_x-hwidth);
+  intensity(0x7f);
+  lines(4, vector_lines);
+};
+void display_hovered_star(int8_t origin_y, int8_t origin_x, uint8_t radius, uint8_t phase) {
+  int8_t base_vector_dots[8] = {
+    radius, 0,          // Outer, starting Top going CW
+    -radius, radius,
+    -radius, -radius,
+    radius, -radius,
+  };
+  int8_t rotated_vector_dots[8];
+  rotate(phase, 4, base_vector_dots, rotated_vector_dots);
+  reset_beam();
+  move(origin_y, origin_x);
+  for(uint8_t i=0; i<4; i++) {
+    dot(rotated_vector_dots[2*i], rotated_vector_dots[2*i +1]);
+  }
+  // dots(..., rotated_vector_dots);  // ### Creates a ghost dot offset from others when called here, not sure why ###
+}
+
+
+void display_battle_screen(uint8_t hovered_battle_option, uint8_t battle_mode, uint8_t timer) {
+  /*
+  . Displays the battle screen which consists of;
+    . Sprites for both pokemon
+      . +Health and experience for pokemon
+      . +Battle arena floor (OPTIONAL)
+    . Battle options
+      . Fight, Run, Bag, Switch
+    . Descriptive fight log
+    . Animations for actions -> Calculate and alter sprite offsets by reference
+  */
+  const uint8_t battle_log_extension = 20;       // Half-width of the battle log that EXTENDS beyond the half-way section of the screen (1/2 way minimum); The battle options will fill the remainder of the width
+  const uint8_t battle_options_hheight = 10;  // Half-height of each battle option box (fight, run, etc) 
+
+  set_scale(128);
+
+  display_battle_screen_pokemons();  // ### PARSE IN POKEMON HERE ### <-- POINTERS
+  switch(battle_mode) {
+    case 0:
+      display_battle_screen_battle_options(hovered_battle_option, battle_log_extension, battle_options_hheight, timer);
+      break;
+    case 1:
+      display_battle_screen_battle_options_fight(hovered_battle_option, battle_log_extension, battle_options_hheight, timer);
+      break;
+  }
+  display_battle_screen_battle_log((char*)"BATTLE_LOG", battle_log_extension, battle_options_hheight);
+};
+
+
+void display_battle_screen_pokemons() {
+  /*
+  . Displays both pokemon involved in a battle
+  . Position of their display is fixed
+  */
+  const uint8_t poke_radius = 20;
+  const int8_t poke_friendly_position_y = -40;  // Lower half --> Will always display the sprite and poke-bar on opposite sides of the screen horizontally, only the height is required
+  const int8_t poke_hostile_position_y = 80;    // Upper half
+  // ### HAVE OFFSETS FOR ANIMATIONS REMEMVERED HERE ###
+
+  const uint8_t poke_stats_dimensions[2] = {10, 40};   // (hheight, hwidth) format
+
+  display_battle_screen_pokemon(poke_friendly_position_y, poke_radius, poke_stats_dimensions, 1);
+  display_battle_screen_pokemon(poke_hostile_position_y, poke_radius, poke_stats_dimensions, 0);
+};
+void display_battle_screen_pokemon(const int8_t poke_position_y, uint8_t poke_radius, const uint8_t *poke_stats_dimensions, const uint8_t isLeftSide) {
+  /*
+  . Displays a specific pokemon in the battle screen
+  . Displays relevant information about the pokemon alongside its sprite, such as;
+    . Health
+    . Experience
+  */
+  int8_t poke_position_x = (isLeftSide==1) ? (int8_t)(-128+(2*poke_radius)) : (int8_t)(poke_position_x = 128-2*poke_radius);  // L / R side
+
+  display_cube( poke_position_y, poke_position_x, poke_radius );   // Poke sprite
+  display_battle_screen_pokemon_stats(poke_position_y, isLeftSide, poke_stats_dimensions);  // Poke stats bar
+};
+void display_battle_screen_pokemon_stats(const int8_t bar_position_y, const uint8_t isLeftSide, const uint8_t *poke_stats_dimensions) {
+  /*
+  . Displays the health and experience of a pokemon
+  
+  Note; 'isLeftSide' refers to the position of the pokemon the bar is linked to, hence if isLeftSide==1, then the bar is on the RIGHT, not the left
+  */
+  int8_t lean = 5; // Tilt on either end of the outer bar shape + experience bar width
+  int8_t bar_position_x = (isLeftSide==1) ? (int8_t)(128-(poke_stats_dimensions[1]+5)) : (int8_t)(-128+(poke_stats_dimensions[1]+5));  // L / R side
+
+  int8_t vector_lines[14] = {  // Start on left-middle (experience bar left edge), end on top of right-middle
+    2*poke_stats_dimensions[0], lean,
+    0, 2*poke_stats_dimensions[1], 
+    -2*poke_stats_dimensions[0], -lean,
+    0, -2*poke_stats_dimensions[1],
+    -(2*poke_stats_dimensions[0])>>1, 0,
+    0, 2*poke_stats_dimensions[1],
+    (2*poke_stats_dimensions[0])>>1, 0,
+  };
+
+  // ###
+  // ### Should prob parse in from data outside
+  // ###
+  uint8_t health = 36;
+  uint8_t health_max = 42;
+  const uint8_t health_ratio = (uint8_t)( ((uint16_t)health << 8) /health_max );  // As a ratio of 256, truncated in division if fractional part remaining
+
+  uint8_t experience = 12;
+  uint8_t experience_max = 60;
+  const uint8_t experience_ratio = (uint8_t)( ((uint16_t)experience << 8) /experience_max );
+
+
+  // ### Can collapse this to be done in fewer vectors if wobble is seen ###
+  reset_beam();
+  move(bar_position_y-2*poke_stats_dimensions[0], bar_position_x-poke_stats_dimensions[1]);
+  lines(7, vector_lines); // Draw cage + experience bar, beam ends at bottom-right (above experience)
+
+  const uint8_t bar_buffer = 2;
+  // Draw health
+  const uint8_t health_vector_distance = (uint8_t)( ((uint16_t)(health_ratio)*2*(poke_stats_dimensions[1]-bar_buffer)) >>8);
+  move(-(2*poke_stats_dimensions[0]>>3), -2*poke_stats_dimensions[1] +bar_buffer);
+  line(0, health_vector_distance);
+
+  // Draw experience
+  const uint8_t experience_vector_distance = (uint8_t)( ((uint16_t)(experience_ratio)*2*(poke_stats_dimensions[1]-bar_buffer)) >>8);
+  move(-(2*poke_stats_dimensions[0]>>2) +1, -health_vector_distance);
+  line(0, experience_vector_distance);
+
+  // Draw name and level
+  reset_beam();
+  set_text_size( -(poke_stats_dimensions[0]>>1), poke_stats_dimensions[1] );
+  print_str_c(bar_position_y -(poke_stats_dimensions[0]>>1), bar_position_x-(poke_stats_dimensions[1]) +(poke_stats_dimensions[1]>>2), (char*)"NAME");
+  print_str_c(bar_position_y -(poke_stats_dimensions[0]>>1), bar_position_x, (char*)"LVL:XX");
+  set_scale(128);
+}
+
+
+void display_battle_screen_battle_options(uint8_t hovered_option, const uint8_t battle_log_extension, const uint8_t battle_options_hheight, uint8_t timer) {
+  /*
+  . Displays the 4 battle options in the bottom-right corner of the screen;
+    . Fight . Pokemon
+    . Bag   . Run
+  */
+  uint8_t buffer = 2;
+  uint8_t option_hwidth = (128-battle_log_extension+2*buffer)/4;  // Truncated float to uint8_t
+
+  reset_beam();
+  // Draw boxes
+  // Top-Left, Going CW
+  display_rect(-128+buffer+2*battle_options_hheight +1*battle_options_hheight, 128-buffer-2*option_hwidth -1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight +1*battle_options_hheight, 128-buffer-2*option_hwidth +1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight -1*battle_options_hheight, 128-buffer-2*option_hwidth +1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight -1*battle_options_hheight, 128-buffer-2*option_hwidth -1*option_hwidth, battle_options_hheight, option_hwidth);
+
+  // Draw labels
+  reset_beam();
+  set_text_size(-battle_options_hheight>>1, 4*battle_options_hheight);
+  print_str_c(-128+buffer+2*battle_options_hheight +1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth -1*option_hwidth -(option_hwidth>>1), (char*)"FIGHT");
+  print_str_c(-128+buffer+2*battle_options_hheight +1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth +1*option_hwidth -(option_hwidth>>1), (char*)"BAG");
+  print_str_c(-128+buffer+2*battle_options_hheight -1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth +1*option_hwidth -(option_hwidth>>1), (char*)"RUN");
+  print_str_c(-128+buffer+2*battle_options_hheight -1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth -1*option_hwidth -(option_hwidth>>1), (char*)"POKE");
+  set_scale(128);
+
+  // Draw hovered icon
+  reset_beam();
+  if( (0 <= hovered_option) && (hovered_option < 4) ) {
+    uint8_t y_factor = (hovered_option<2) ? 1 : -1;     // Chooses the box to hovered from the hovered index given
+    uint8_t x_factor = (hovered_option%2==0) ? -1 : 1;  //
+    display_hovered_star(
+      -128+buffer+2*battle_options_hheight +y_factor*battle_options_hheight +(battle_options_hheight>>1), 
+      128-buffer-2*option_hwidth +x_factor*option_hwidth -(option_hwidth>>1) -(option_hwidth>>2), 
+      2, 
+      timer
+    );
+    display_hovered_star(
+      -128+buffer+2*battle_options_hheight +y_factor*battle_options_hheight +(battle_options_hheight>>1), 
+      128-buffer-2*option_hwidth +x_factor*option_hwidth +(option_hwidth>>1) +(option_hwidth>>2), 
+      2, 
+      timer
+    );
+  }
+};
+
+void display_battle_screen_battle_options_fight(uint8_t hovered_option, const uint8_t battle_log_extension, const uint8_t battle_options_hheight, uint8_t timer) {
+  /*
+  . Displays the 4 moves the pokemon can use
+    . Move1 . Move2
+    . Move3 . Move4
+  */
+  uint8_t buffer = 2;
+  uint8_t option_hwidth = (128-battle_log_extension+2*buffer)/4;  // Truncated float to uint8_t
+  char* moves[4] = {
+    (char*)"MOVE1",
+    (char*)"MOVE2",
+    (char*)"MOVE3",
+    (char*)"MOVE4",
+  };
+
+  reset_beam();
+  // Draw boxes
+  // Top-Left, Going CW
+  display_rect(-128+buffer+2*battle_options_hheight +1*battle_options_hheight, 128-buffer-2*option_hwidth -1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight +1*battle_options_hheight, 128-buffer-2*option_hwidth +1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight -1*battle_options_hheight, 128-buffer-2*option_hwidth +1*option_hwidth, battle_options_hheight, option_hwidth);
+  display_rect(-128+buffer+2*battle_options_hheight -1*battle_options_hheight, 128-buffer-2*option_hwidth -1*option_hwidth, battle_options_hheight, option_hwidth);
+
+  // Draw labels
+  reset_beam();
+  set_text_size(-battle_options_hheight>>1, 4*battle_options_hheight);
+  print_str_c(-128+buffer+2*battle_options_hheight +1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth -1*option_hwidth -(option_hwidth>>1), moves[0]);
+  print_str_c(-128+buffer+2*battle_options_hheight +1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth +1*option_hwidth -(option_hwidth>>1), moves[1]);
+  print_str_c(-128+buffer+2*battle_options_hheight -1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth +1*option_hwidth -(option_hwidth>>1), moves[2]);
+  print_str_c(-128+buffer+2*battle_options_hheight -1*battle_options_hheight +(battle_options_hheight>>1), 128-buffer-2*option_hwidth -1*option_hwidth -(option_hwidth>>1), moves[3]);
+  set_scale(128);
+
+  // Draw hovered icon
+  reset_beam();
+  if( (0 <= hovered_option) && (hovered_option < 4) ) {
+    uint8_t y_factor = (hovered_option<2) ? 1 : -1;     // Chooses the box to hovered from the hovered index given
+    uint8_t x_factor = (hovered_option%2==0) ? -1 : 1;  //
+    display_hovered_star(
+      -128+buffer+2*battle_options_hheight +y_factor*battle_options_hheight +(battle_options_hheight>>1), 
+      128-buffer-2*option_hwidth +x_factor*option_hwidth -(option_hwidth>>1) -(option_hwidth>>2), 
+      2, 
+      timer
+    );
+    display_hovered_star(
+      -128+buffer+2*battle_options_hheight +y_factor*battle_options_hheight +(battle_options_hheight>>1), 
+      128-buffer-2*option_hwidth +x_factor*option_hwidth +(option_hwidth>>1) +(option_hwidth>>2), 
+      2, 
+      timer
+    );
+  }
+};
+
+
+void display_battle_screen_battle_log(char* battle_text, const uint8_t battle_log_extension, const uint8_t battle_options_hheight) {
+  /*
+  . Displays the battle log, which describes events occurring in the battle in a text box
+  */
+  //display_rect(-128+2*battle_options_hheight, -128+battle_log_hwidth, 2*battle_options_hheight, battle_log_hwidth);
+
+  uint8_t buffer = 2; // Give some space at the left/bottom edge of the battle log
+  int8_t vector_lines[12] = {
+    0, 120,
+    0, battle_log_extension,
+    -4*battle_options_hheight, 0,
+    0, -battle_log_extension,
+    0, -120,
+    4*battle_options_hheight, 0,
+  };
+  reset_beam();
+  set_scale(128);
+  // move(0,0);
+  move(-128+4*battle_options_hheight+buffer, -128+buffer);
+  lines(6, vector_lines);
+
+  reset_beam();
+  set_text_size(-battle_options_hheight>>1, 4*battle_options_hheight);
+  print_str_c(-128+4*battle_options_hheight -(battle_options_hheight>>1)+buffer, -128+buffer, battle_text);
+  set_scale(128);
+};
+
+
+void calculate_battle_screen(uint8_t *hovered_battle_option, uint8_t *battle_mode) {
+  uint8_t buttons = read_buttons();
+  if (buttons & JOY1_BTN1_MASK) {
+    *hovered_battle_option = (*hovered_battle_option+1)%4;
+    reset_beam();
+    print_str_c(0, 0, (char*)"PRESSED 1");
+    set_scale(128);
+  }
+  if (buttons & JOY1_BTN2_MASK) {
+    *hovered_battle_option = (*hovered_battle_option-1);
+    if(*hovered_battle_option > 3) {*hovered_battle_option=3;}  // Will loop to 256 when attempting to go negative
+    reset_beam();
+    print_str_c(0, 0, (char*)"PRESSED 2");
+    set_scale(128);
+  }
+  if (buttons & JOY1_BTN3_MASK) {
+    *battle_mode = (*battle_mode+1)%6;
+    reset_beam();
+    print_str_c(0, 0, (char*)"PRESSED 3");
+    set_scale(128);
+  }
+}
+
 
 int main()
 {
-  // Poke test - Charmander highRes
-  int8_t vector_array[708] = {
-    27, -11, 0, 
-    0, 4, 6, 
-    -1, -7, 0, 
-    0, 12, 7, 
-    -1, -14, 0, 
-    0, 17, 7, 
-    -1, -18, 0, 
-    0, 18, 7, 
-    -1, -18, 0, 
-    0, 20, 7, 
-    -1, -21, 0, 
-    0, 21, 7, 
-    -1, -22, 0, 
-    0, 23, 7, 
-    -1, -21, 0, 
-    0, 15, 7, 
-    0, 4, 2, 
-    0, 2, 5, 
-    -1, -21, 0, 
-    0, 13, 7, 
-    0, 8, 2, 
-    0, 0, 5, 
-    -1, -22, 0, 
-    0, 16, 7, 
-    0, 6, 3, 
-    0, 0, 5, 
-    -1, -21, 0, 
-    0, 16, 7, 
-    0, 2, 3, 
-    0, 1, 6, 
-    0, 3, 4, 
-    0, 0, 5, 
-    -1, -22, 0, 
-    0, 15, 7, 
-    0, 2, 4, 
-    0, 2, 6, 
-    0, 2, 5, 
-    0, 1, 5, 
-    0, 26, 0, 
-    0, 2, 7, 
-    -1, -51, 0, 
-    0, 18, 7, 
-    0, 0, 5, 
-    0, 5, 5, 
-    0, 25, 0, 
-    0, 0, 4, 
-    0, 0, 4, 
-    0, 2, 7, 
-    -1, -52, 0, 
-    0, 19, 7, 
-    0, 3, 4, 
-    0, 2, 5, 
-    0, 25, 0, 
-    0, 3, 7, 
-    -1, -51, 0, 
-    0, 16, 7, 
-    0, 5, 4, 
-    0, 1, 5, 
-    0, 26, 1, 
-    0, 5, 7, 
-    -1, -49, 0, 
-    0, 10, 7, 
-    0, 2, 4, 
-    0, 1, 5, 
-    0, 2, 4, 
-    0, 2, 5, 
-    0, 26, 1, 
-    0, 6, 7, 
-    -1, -49, 0, 
-    0, 6, 6, 
-    0, 6, 2, 
-    0, 6, 7, 
-    0, 13, 3, 
-    0, 0, 5, 
-    0, 12, 0, 
-    0, 0, 4, 
-    0, 0, 4, 
-    0, 7, 7, 
-    -1, -39, 0, 
-    0, 1, 5, 
-    0, 3, 5, 
-    0, 2, 5, 
-    0, 5, 3, 
-    0, 8, 7, 
-    0, 12, 1, 
-    0, 3, 7, 
-    0, 1, 4, 
-    0, 4, 7, 
-    -1, -58, 0, 
-    0, 0, 5, 
-    0, 22, 3, 
-    0, 15, 7, 
-    0, 17, 3, 
-    0, 5, 7, 
-    0, 0, 4, 
-    0, 0, 4, 
-    -1, -59, 0, 
-    0, 7, 7, 
-    0, 4, 1, 
-    0, 4, 7, 
-    0, 5, 2, 
-    0, 15, 6, 
-    0, 15, 1, 
-    0, 3, 6, 
-    0, 2, 4, 
-    0, 5, 7, 
-    -1, -61, 0, 
-    0, 12, 6, 
-    0, 7, 1, 
-    0, 17, 5, 
-    0, 14, 0, 
-    0, 4, 7, 
-    0, 1, 4, 
-    0, 6, 7, 
-    -1, -58, 0, 
-    0, 29, 5, 
-    0, 17, 0, 
-    0, 11, 7, 
-    -1, -55, 0, 
-    0, 5, 5, 
-    0, 3, 4, 
-    0, 12, 6, 
-    0, 22, 1, 
-    0, 11, 7, 
-    -1, -51, 0, 
-    0, 2, 5, 
-    0, 2, 3, 
-    0, 15, 7, 
-    0, 21, 0, 
-    0, 0, 4, 
-    0, 0, 4, 
-    0, 3, 6, 
-    0, 0, 4, 
-    0, 5, 7, 
-    -1, -46, 0, 
-    0, 16, 7, 
-    0, 23, 0, 
-    0, 1, 4, 
-    0, 5, 4, 
-    0, 0, 4, 
-    -1, -46, 0, 
-    0, 17, 7, 
-    -1, -18, 0, 
-    0, 19, 7, 
-    0, 25, 0, 
-    0, 1, 7, 
-    -1, -45, 0, 
-    0, 20, 7, 
-    0, 23, 0, 
-    0, 2, 7, 
-    -1, -46, 0, 
-    0, 12, 7, 
-    0, 1, 2, 
-    0, 9, 7, 
-    0, 21, 0, 
-    0, 3, 7, 
-    -1, -46, 0, 
-    0, 22, 7, 
-    0, 20, 1, 
-    0, 4, 7, 
-    -1, -46, 0, 
-    0, 23, 7, 
-    0, 18, 2, 
-    0, 4, 7, 
-    -1, -45, 0, 
-    0, 24, 7, 
-    0, 13, 2, 
-    0, 7, 7, 
-    -1, -48, 0, 
-    0, 29, 7, 
-    0, 7, 2, 
-    0, 12, 7, 
-    -1, -48, 0, 
-    0, 4, 7, 
-    0, 0, 5, 
-    0, 24, 7, 
-    0, 4, 3, 
-    0, 13, 6, 
-    -1, -48, 0, 
-    0, 5, 7, 
-    0, 1, 3, 
-    0, 25, 7, 
-    0, 3, 2, 
-    0, 11, 6, 
-    -1, -46, 0, 
-    0, 6, 7, 
-    0, 2, 2, 
-    0, 23, 7, 
-    0, 3, 2, 
-    0, 9, 7, 
-    -1, -44, 0, 
-    0, 8, 7, 
-    0, 3, 2, 
-    0, 8, 7, 
-    0, 2, 3, 
-    0, 11, 6, 
-    0, 3, 2, 
-    0, 6, 7, 
-    -1, -39, 0, 
-    0, 7, 6, 
-    0, 5, 2, 
-    0, 5, 7, 
-    0, 2, 3, 
-    0, 11, 5, 
-    0, 3, 2, 
-    0, 3, 7, 
-    -1, -34, 0, 
-    0, 6, 5, 
-    0, 13, 2, 
-    0, 7, 5, 
-    -1, -26, 0, 
-    0, 5, 5, 
-    0, 15, 1, 
-    0, 6, 5, 
-    -1, -26, 0, 
-    0, 6, 5, 
-    0, 14, 0, 
-    0, 6, 7, 
-    -1, -30, 0, 
-    0, 2, 7, 
-    0, 1, 3, 
-    0, 5, 7, 
-    0, 16, 1, 
-    0, 7, 7, 
-    -1, -5, 0, 
-    0, 3, 7, 
-    0, 0, 4, 
-    0, 3, 7, 
-    0, 1, 4, 
-    0, 1, 7, 
-    -1, -8, 0, 
-    0, 1, 6, 
-    0, 3, 3, 
-    0, 1, 6, 
-    0, 3, 3, 
-    0, 1, 6, 
-  };
+  /*
+  battle_mode = 
+      0 => Choosing which option to pick initially (fight, bag, poke, run)  <-- Reset the hovered_option on change
+      1 => Choosing which fight option to use (Atk1, Atk2, Atk3, Atk4)      <-- "" ""
+      2 => Choosing which bag option to use [Screen Change]
+      3 => Choosing which poke to use [Screen Change]
+      4 => Exit battle screen [Screen Change]
+      5 => Watch the battle occur [Remove options, leave battle log alone]
+      ...
+  */
+  uint8_t timer = 0;  // Continually ticks -> used for animations
 
-
-  // Poke test - Charmander midRes
-  // int8_t vector_array[312] = {  //222
-  //   22, -9, 0, 
-  //   0, 14, 7, 
-  //   -2, -17, 0, 
-  //   0, 19, 7, 
-  //   -2, -20, 0, 
-  //   0, 22, 7, 
-  //   -2, -20, 0, 
-  //   0, 16, 7, 
-  //   0, 3, 3, 
-  //   0, 3, 6, 
-  //   -2, -22, 0, 
-  //   0, 16, 7, 
-  //   0, 5, 3, 
-  //   0, 1, 7, 
-  //   -2, -22, 0, 
-  //   0, 22, 7, 
-  //   0, 25, 0, 
-  //   0, 3, 7, 
-  //   -2, -52, 0, 
-  //   0, 20, 7, 
-  //   0, 1, 4, 
-  //   0, 3, 6, 
-  //   0, 24, 0, 
-  //   0, 4, 7, 
-  //   -2, -50, 0, 
-  //   0, 12, 7, 
-  //   0, 1, 4, 
-  //   0, 3, 6, 
-  //   0, 1, 4, 
-  //   0, 3, 6, 
-  //   0, 25, 1, 
-  //   0, 7, 7, 
-  //   -2, -39, 0, 
-  //   0, 2, 6, 
-  //   0, 1, 5, 
-  //   0, 4, 6, 
-  //   0, 4, 3, 
-  //   0, 9, 7, 
-  //   0, 11, 1, 
-  //   0, 9, 7, 
-  //   -2, -59, 0, 
-  //   0, 8, 7, 
-  //   0, 4, 2, 
-  //   0, 4, 7, 
-  //   0, 4, 1, 
-  //   0, 16, 6, 
-  //   0, 13, 1, 
-  //   0, 12, 7, 
-  //   -2, -59, 0, 
-  //   0, 30, 5, 
-  //   0, 16, 0, 
-  //   0, 13, 7, 
-  //   -2, -52, 0, 
-  //   0, 3, 6, 
-  //   0, 2, 4, 
-  //   0, 16, 7, 
-  //   0, 21, 0, 
-  //   0, 10, 7, 
-  //   -2, -48, 0, 
-  //   0, 18, 7, 
-  //   -2, -19, 0, 
-  //   0, 21, 7, 
-  //   0, 22, 0, 
-  //   0, 2, 7, 
-  //   -2, -47, 0, 
-  //   0, 23, 7, 
-  //   0, 19, 0, 
-  //   0, 5, 7, 
-  //   -2, -47, 0, 
-  //   0, 25, 7, 
-  //   0, 12, 2, 
-  //   0, 8, 7, 
-  //   -2, -48, 0, 
-  //   0, 30, 7, 
-  //   0, 3, 3, 
-  //   0, 15, 6, 
-  //   -2, -48, 0, 
-  //   0, 7, 7, 
-  //   0, 2, 4, 
-  //   0, 24, 7, 
-  //   0, 3, 2, 
-  //   0, 10, 7, 
-  //   -2, -43, 0, 
-  //   0, 8, 6, 
-  //   0, 4, 2, 
-  //   0, 6, 7, 
-  //   0, 1, 4, 
-  //   0, 11, 5, 
-  //   0, 2, 3, 
-  //   0, 4, 7, 
-  //   -2, -35, 0, 
-  //   0, 6, 6, 
-  //   0, 14, 1, 
-  //   0, 6, 6, 
-  //   -2, -30, 0, 
-  //   0, 8, 7, 
-  //   0, 16, 1, 
-  //   0, 8, 7, 
-  //   -2, -5, 0, 
-  //   0, 1, 7, 
-  //   0, 2, 4, 
-  //   0, 1, 7, 
-  //   0, 2, 3, 
-  //   0, 1, 7,
-  // };
-
-  // Poke-test - Milotic LowRes
-  // int8_t vector_array[240] = {
-  //   -2, 44, 0, 
-  //   0, 1, 6, 
-  //   0, 5, 1, 
-  //   0, 3, 7, 
-  //   0, 2, 3, 
-  //   0, 3, 7, 
-  //   -2, -36, 0, 
-  //   0, 16, 7, 
-  //   0, 7, 1, 
-  //   0, 1, 6, 
-  //   0, 2, 4, 
-  //   0, 2, 6, 
-  //   0, 3, 4, 
-  //   0, 2, 6, 
-  //   0, 4, 4, 
-  //   0, 3, 7, 
-  //   -2, -44, 0, 
-  //   0, 27, 7, 
-  //   0, 3, 1, 
-  //   0, 1, 5, 
-  //   0, 3, 4, 
-  //   0, 0, 6, 
-  //   0, 2, 4, 
-  //   0, 0, 5, 
-  //   -2, -40, 0, 
-  //   0, 12, 7, 
-  //   0, 2, 4, 
-  //   0, 19, 7, 
-  //   -2, -38, 0, 
-  //   0, 2, 5, 
-  //   0, 4, 4, 
-  //   0, 3, 7, 
-  //   0, 4, 4, 
-  //   0, 2, 5, 
-  //   0, 9, 0, 
-  //   0, 16, 7, 
-  //   -2, -32, 0, 
-  //   0, 5, 5, 
-  //   0, 11, 1, 
-  //   0, 16, 7, 
-  //   -2, -41, 0, 
-  //   0, 4, 5, 
-  //   0, 12, 3, 
-  //   0, 2, 5, 
-  //   0, 8, 2, 
-  //   0, 15, 7, 
-  //   -2, -43, 0, 
-  //   0, 3, 5, 
-  //   0, 9, 1, 
-  //   0, 2, 7, 
-  //   0, 2, 4, 
-  //   0, 1, 5, 
-  //   0, 7, 4, 
-  //   0, 16, 7, 
-  //   -2, -40, 0, 
-  //   0, 1, 5, 
-  //   0, 8, 1, 
-  //   0, 4, 7, 
-  //   0, 8, 0, 
-  //   0, 8, 7, 
-  //   0, 1, 4, 
-  //   0, 6, 7, 
-  //   -2, -33, 0, 
-  //   0, 10, 7, 
-  //   0, 1, 4, 
-  //   0, 1, 5, 
-  //   0, 5, 5, 
-  //   0, 1, 5, 
-  //   0, 2, 4, 
-  //   0, 6, 7, 
-  //   0, 11, 1, 
-  //   0, 0, 5, 
-  //   -2, -42, 0, 
-  //   0, 9, 7, 
-  //   0, 16, 3, 
-  //   0, 3, 5, 
-  //   -2, -27, 0, 
-  //   0, 6, 7, 
-  //   0, 3, 3, 
-  //   0, 4, 7, 
-  // };
-
-  // // Low-Res Smile
-  // int8_t vector_array[120] = {
-  //   0, 16, 0, 
-  //   0, 6, 4, 
-  //   -2, -15, 0, 
-  //   0, 3, 7, 
-  //   0, 18, 0, 
-  //   0, 3, 7, 
-  //   -2, -28, 0, 
-  //   0, 2, 7, 
-  //   0, 28, 0, 
-  //   0, 2, 7, 
-  //   -2, -34, 0, 
-  //   0, 2, 7, 
-  //   0, 8, 0, 
-  //   0, 2, 7, 
-  //   0, 11, 0, 
-  //   0, 2, 7, 
-  //   0, 8, 0, 
-  //   0, 2, 7, 
-  //   -2, -37, 0, 
-  //   0, 2, 7, 
-  //   0, 33, 0, 
-  //   0, 2, 7, 
-  //   -2, -36, 0, 
-  //   0, 2, 7, 
-  //   0, 7, 0, 
-  //   0, 2, 7, 
-  //   0, 13, 0, 
-  //   0, 2, 7, 
-  //   0, 7, 0, 
-  //   0, 2, 7, 
-  //   -2, -33, 0, 
-  //   0, 3, 7, 
-  //   0, 9, 0, 
-  //   0, 8, 7, 
-  //   0, 9, 0, 
-  //   0, 3, 7, 
-  //   -2, -26, 0, 
-  //   0, 4, 7, 
-  //   0, 14, 0, 
-  //   0, 4, 7, 
-  // };
-  // ###
-  // ### SPLIT INTO 2 LISTS SO ITERATING ON REQUIRES UNSIGNED 8 BIT MORE EASILY
-  // ###
-
-  // A test shape
-  int8_t TEST_vector_array[12] = {
-    0, 20, 7, 
-    -15, 0, 5, 
-    0, -10, 3, 
-    5, 0, 1, 
-  };
-
-  // **
-  // ** Note; Refresh had little effect for small number of vectors drawn for smiley
-  // **   Assuming this is the refreshRate/frameRate
-  // **
-  // set_refresh(30);
-
-  // **
-  // ** Is a reset_beam() problem --> too many vectors before resetting
-  // **   Judging by eye, the limit is roughly 20 vectors (1/2 the smiley face) -> BUT distance is a better measure
-  // **
-
-  uint8_t offset = 0;
+  uint8_t hovered_battle_option = 1;  // Which battle option is readied to be selected
+  uint8_t battle_mode = 0;
 
   while(1)
   {
-    int8_t currentY = 0;
-    int8_t currentX = 0;
     wait_retrace();
+    display_battle_screen(hovered_battle_option, battle_mode, timer);   // ### SHOULD PROBABLY JUST PARSE POINTERS HERE TOO ###
+    calculate_battle_screen(&hovered_battle_option, &battle_mode);
 
-    move( (offset>>2) , 0);
-    currentY+= (offset>>2);
-    
-    for(int i=0; i<708; i+=3) { //** Change list length  
-      if(vector_array[i+2] > 0) {
-        if(     vector_array[i+2] == 1) { intensity(0x1f); }
-        else if(vector_array[i+2] == 2) { intensity(0x2f); }
-        else if(vector_array[i+2] == 3) { intensity(0x3f); }
-        else if(vector_array[i+2] == 4) { intensity(0x4f); }
-        else if(vector_array[i+2] == 5) { intensity(0x5f); }
-        else if(vector_array[i+2] == 6) { intensity(0x6f); }
-        else if(vector_array[i+2] == 7) { intensity(0x7f); }
-        // intensity(0x7f);
-        line(vector_array[i], vector_array[i+1]);
-      } else {
-        intensity(0x0f);
-        move(vector_array[i], vector_array[i+1]);
-      }
-
-      currentY += vector_array[i];
-      currentX += vector_array[i+1];
-      reset_beam();
-      move(currentY, currentX);
-    }
-    offset++;
+    timer++;
   }
   return 0;
-}
+};
