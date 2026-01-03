@@ -13,3 +13,8 @@ void display_battle_screen_battle_options_fight(uint8_t hovered_option, const ui
 void display_battle_screen_battle_log(char* battle_text, const uint8_t battle_log_extension, const uint8_t battle_options_hheight);
 
 void calculate_battle_screen(uint8_t *hovered_battle_option, uint8_t *battle_mode);
+
+
+void display_battle_screen_pokeswitch_screen(uint8_t hovered_pokeswitch, uint8_t timer);
+void display_battle_screen_pokeswitch_poke_details(int8_t origin_y, int8_t origin_x, uint8_t screen_hheight, uint8_t screen_hwidth);
+void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, uint8_t *battle_mode);

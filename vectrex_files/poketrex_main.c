@@ -50,6 +50,9 @@ void display_hovered_star(int8_t origin_y, int8_t origin_x, uint8_t radius, uint
 }
 
 
+// -------------------
+// -- BATTLE_SCREEN --
+// -------------------
 void display_battle_screen(uint8_t hovered_battle_option, uint8_t battle_mode, uint8_t timer) {
   /*
   . Displays the battle screen which consists of;
@@ -291,27 +294,137 @@ void display_battle_screen_battle_log(char* battle_text, const uint8_t battle_lo
 
 void calculate_battle_screen(uint8_t *hovered_battle_option, uint8_t *battle_mode) {
   uint8_t buttons = read_buttons();
-  if (buttons & JOY1_BTN1_MASK) {
+  if(buttons & JOY1_BTN1_MASK) {
     *hovered_battle_option = (*hovered_battle_option+1)%4;
     reset_beam();
     print_str_c(0, 0, (char*)"PRESSED 1");
     set_scale(128);
   }
-  if (buttons & JOY1_BTN2_MASK) {
+  if(buttons & JOY1_BTN2_MASK) {
     *hovered_battle_option = (*hovered_battle_option-1);
     if(*hovered_battle_option > 3) {*hovered_battle_option=3;}  // Will loop to 256 when attempting to go negative
     reset_beam();
     print_str_c(0, 0, (char*)"PRESSED 2");
     set_scale(128);
   }
-  if (buttons & JOY1_BTN3_MASK) {
+  if(buttons & JOY1_BTN3_MASK) {
     *battle_mode = (*battle_mode+1)%6;
+    reset_beam();
+    print_str_c(0, 0, (char*)"PRESSED 3");
+    set_scale(128);
+  }
+  if( (buttons & JOY1_BTN4_MASK) && (hovered_battle_option==0) ) {  // Select button when hovering fight option
+    *battle_mode = 1;
     reset_beam();
     print_str_c(0, 0, (char*)"PRESSED 3");
     set_scale(128);
   }
 }
 
+//-----------------------
+//-- POKESWITCH_SCREEN --
+//-----------------------
+
+void display_battle_screen_pokeswitch_screen(uint8_t hovered_pokeswitch, uint8_t timer) {
+  /*
+  . Displays the screen to switch pokemon mid battle
+  . This screen can only appear when in battle; a different screen will be used when viewing pokemon outside of battle
+  */
+  // ** Note; At least 2x3 (x X y) must be shown, hence switchbox_hwidth in [0, 42-delta], and switchbox_hheight in [0, 64-delta]
+  uint8_t switchbox_hheight = 20;
+  uint8_t switchbox_hwidth = 60;
+  uint8_t title_buffer = 20;      // Space given for title to be shown
+  
+  int8_t vector_lines[46] = {
+    // Outer edge + center line
+    0, 2*switchbox_hwidth, 
+    0, 2*switchbox_hwidth, 
+    -2*switchbox_hheight, 0,
+    -2*switchbox_hheight, 0,
+    -2*switchbox_hheight, 0,
+    0, -2*switchbox_hwidth,
+    0, -2*switchbox_hwidth,
+    2*switchbox_hheight, 0,
+    2*switchbox_hheight, 0,
+    2*switchbox_hheight, 0,
+    0, 2*switchbox_hwidth, 
+    -2*switchbox_hheight, 0,
+    -2*switchbox_hheight, 0,
+    -2*switchbox_hheight, 0,
+
+    // Horizontal lines
+    2*switchbox_hheight, 0,
+    0, 2*switchbox_hwidth,
+    0, -2*switchbox_hwidth,
+    0, -2*switchbox_hwidth,
+    0, 2*switchbox_hwidth,
+
+    2*switchbox_hheight, 0,
+    0, 2*switchbox_hwidth,
+    0, -2*switchbox_hwidth,
+    0, -2*switchbox_hwidth, 
+  };
+
+  // Draw poke switchboxes frame
+  set_scale(128);
+  move(128-title_buffer, -128+(64-switchbox_hwidth));
+  lines(23, vector_lines);
+
+  // Draw switchbox contents
+  // (1) Small sprite, (2) Health, (3) Name
+  for(uint8_t j=0; j<3; j++) {
+    for(uint8_t i=0; i<2; i++) {
+      // ### GET POKE DETAILS FROM Ith INDEX ###
+      uint8_t pokeswitch_index = i +2*j;  // Which index in the list the considered pokemon is at
+      display_battle_screen_pokeswitch_poke_details(128-title_buffer-(switchbox_hheight>>2) -j*2*switchbox_hheight, -128+(64-switchbox_hwidth) +i*2*switchbox_hwidth, switchbox_hheight, switchbox_hwidth);
+      display_cube(128-title_buffer-switchbox_hheight -j*2*switchbox_hheight, -64 +(switchbox_hwidth>>1) +i*2*switchbox_hwidth, switchbox_hheight>>1);
+      if(hovered_pokeswitch == pokeswitch_index) {
+        display_hovered_star(128-title_buffer -j*2*switchbox_hheight -10, -128+(64-switchbox_hwidth) +2*switchbox_hwidth +i*2*switchbox_hwidth -10, 2, timer);
+      }
+    }
+  }
+
+  reset_beam();
+  set_scale(128);
+  set_text_size(-5, 40);
+  // Draw title
+  print_str_c(128 -(title_buffer>>2), -40, (char*)"SWITCH POKEMON");
+  // Draw hotkey instructions below
+  print_str_c(-64, -128, (char*)"BUTTON 1 = SELECT POKEMON");
+  print_str_c(-64 -title_buffer, -128, (char*)"BUTTON 2 = CYLE POKEMON");
+  print_str_c(-64 -2*title_buffer, -128, (char*)"BUTTON 3 = SUMMARY");
+  print_str_c(-64 -3*title_buffer, -128, (char*)"BUTTON 4 = BACK");
+  
+  set_scale(128);
+}
+
+void display_battle_screen_pokeswitch_poke_details(int8_t origin_y, int8_t origin_x, uint8_t switchbox_hheight, uint8_t switchbox_hwidth) {
+  // ###
+  // ### PARSE IN POKE DETAILS ###
+  // ###
+  /*
+  . Displays the name, health and sprite for a pokemon in a small box for the poke-switch screen
+  */
+  reset_beam();
+  set_scale(128);
+  set_text_size(-5, 40);  // ### MAKE THIS SCALE WITH BOX DIMS ###
+  print_str_c(origin_y, origin_x, (char*)"POKE_NAME");
+  print_str_c(origin_y -(switchbox_hheight>>1) -(switchbox_hheight>>2), origin_x, (char*)"HP: XX/YY");
+}
+
+void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, uint8_t *battle_mode) {
+  uint8_t buttons = read_buttons();
+  if(buttons & JOY1_BTN1_MASK) {
+    *hovered_pokeswitch = (*hovered_pokeswitch+1)%6;
+    reset_beam();
+    print_str_c(0, 0, (char*)"PRESSED 1");
+    set_scale(128);
+  }
+}
+
+//----------
+//-- MAIN --
+//----------
 
 int main()
 {
@@ -328,13 +441,17 @@ int main()
   uint8_t timer = 0;  // Continually ticks -> used for animations
 
   uint8_t hovered_battle_option = 1;  // Which battle option is readied to be selected
+  uint8_t hovered_pokeswitch = 0;     // Which pokemon index (in team) is being hovered when in the pokeswitch screen
   uint8_t battle_mode = 0;
 
   while(1)
   {
     wait_retrace();
-    display_battle_screen(hovered_battle_option, battle_mode, timer);   // ### SHOULD PROBABLY JUST PARSE POINTERS HERE TOO ###
-    calculate_battle_screen(&hovered_battle_option, &battle_mode);
+    // display_battle_screen(hovered_battle_option, battle_mode, timer);   // ### SHOULD PROBABLY JUST PARSE POINTERS HERE TOO ###
+    // calculate_battle_screen(&hovered_battle_option, &battle_mode);
+
+    display_battle_screen_pokeswitch_screen(hovered_pokeswitch, timer);
+    calculate_battle_screen_pokeswitch(&hovered_pokeswitch, &battle_mode);
 
     timer++;
   }
