@@ -48,7 +48,55 @@ int8_t linear_to_oscil(uint8_t x) {
   }
 }
 
+// Poke displays
+void display_tree(int8_t origin_y, int8_t origin_x, uint8_t radius) {
+  /*
+  . Displays a tree within a cube of half-width 'radius', centered at the origin
+  */
+  int8_t vector_lines[8] = {    // ** Note; Non-const as lines requires just char[] argument
+    -radius, radius,  // Center upper section of tree start, travelling roughly CW
+    0, -2*radius,
+    radius, radius,
+    -2*radius, 0,
+  };
+  reset_beam();
+  move(origin_y, origin_x-radius);
+  intensity(0x7f);
+  lines(4, vector_lines);
+};
+void display_grass(int8_t origin_y, int8_t origin_x, uint8_t radius) {
+  /*
+  . Displays a tree within a cube of half-width 'radius', centered at the origin
+  */
+  int8_t vector_lines[8] = {    // ** Note; Non-const as lines requires just char[] argument
+    radius, radius>>1,     // Left bottom side of plant, travelling right
+    -radius, radius>>1,
+    radius, radius>>1,
+    -radius, radius>>1,
+  };
+  reset_beam();
+  move(origin_y, origin_x-radius);
+  intensity(0x7f);
+  lines(4, vector_lines);
+};
+void display_healstation(int8_t origin_y, int8_t origin_x, uint8_t radius) {
+  /*
+  . Displays a cube of half-width equal to radius, and centered at the origin
+  */
+  int8_t vector_lines[10] = {    // ** Note; Non-const as lines requires just char[] argument
+    0, 2*radius,    // Top-left, travelling CW
+    -2*radius, 0,
+    0, -2*radius,
+    2*radius, 0,
+    -2*radius, 2*radius,
+  };
+  reset_beam();
+  move(origin_y+radius, origin_x-radius);
+  intensity(0x7f);
+  lines(5, vector_lines);
+};
 
+// Generic displays
 void display_cube(int8_t origin_y, int8_t origin_x, uint8_t radius) {
   /*
   . Displays a cube of half-width equal to radius, and centered at the origin
@@ -966,7 +1014,8 @@ void display_roam_screen_terrain(uint8_t *terrain, uint8_t terrain_width, uint8_
         int8_t shifted_position_x = i*2*tile_hwidth -player_coordinates[1]*2*tile_hwidth;
 
         if( ((-64+(int16_t)(tile_hwidth)<(int16_t)(shifted_position_y))&&((int16_t)(shifted_position_y)<64-(int16_t)(tile_hwidth))) && ((-64+(int16_t)(tile_hwidth)<(int16_t)(shifted_position_x))&&((int16_t)(shifted_position_x)<64-(int16_t)(tile_hwidth))) ) {
-          display_cube(shifted_position_y, shifted_position_x, tile_hwidth);
+          uint8_t tile_type = terrain[i +terrain_width*j];
+          resolve_terrain_display(tile_type, shifted_position_y, shifted_position_x, tile_hwidth);
         }
       }
     }
@@ -1007,7 +1056,28 @@ uint8_t resolve_terrain_action(uint8_t *terrain, uint8_t terrain_width, uint8_t 
   }
   return action;
 }
-void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t player_coordinates[2], uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
+void resolve_terrain_display(uint8_t tile_type, int8_t draw_position_y, int8_t draw_position_x, uint8_t tile_hwidth) {
+  /*
+  . Calculates what should happen at the given tile type
+  . Returned value indicates action;
+    0 => Empty
+    1 => Tree
+    2 => Grass
+    3 => Heal station
+    ...
+  */
+  // If 0 (empty), draw nothing
+  if(tile_type == 1) {
+    display_tree(draw_position_y, draw_position_x, tile_hwidth);
+  } else if(tile_type == 2) {
+    display_grass(draw_position_y, draw_position_x, tile_hwidth);
+  } else if(tile_type == 3) {
+    display_healstation(draw_position_y, draw_position_x, tile_hwidth);
+  } else {  // If unknown, just draw a cube
+    display_cube(draw_position_y, draw_position_x, tile_hwidth);
+  }
+}
+void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t player_coordinates[2], poke_info *hostile_pokemon, uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
   uint8_t buttons = read_buttons();
   if(buttons & JOY1_BTN1_MASK) {    // Travel up
 
@@ -1018,7 +1088,7 @@ void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terr
     }
     if( action_resolution == 2 ) {
       // TRIGGER A CHANCE TO GO TO BATTLE
-      switch_to_battle(battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
+      switch_to_battle(hostile_pokemon, battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
     }
 
     reset_beam();
@@ -1034,7 +1104,7 @@ void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terr
     }
     if( action_resolution == 2 ) {
       // TRIGGER A CHANCE TO GO TO BATTLE
-      switch_to_battle(battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
+      switch_to_battle(hostile_pokemon, battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
     }
 
     reset_beam();
@@ -1050,13 +1120,69 @@ void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terr
     }
     if( action_resolution == 2 ) {
       // TRIGGER A CHANCE TO GO TO BATTLE
-      switch_to_battle(battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
+      switch_to_battle(hostile_pokemon, battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
     }
 
     reset_beam();
     print_str_c(0, 0, (char*)"PRESSED 3");
     set_scale(128);
   }
+}
+
+// ###
+// ### NOW NEEDS TO CALL THIS FUNC AGAIN WHEN BATTLE IS STARTED -> RESET OPPONENT
+// ###
+
+poke_info generate_pokemon(uint8_t preset) {
+  // poke_info generated_poke = {
+  //   (char*)"STARLY", 6,
+  //   {1,0},
+  //   28, 98, 132,
+  //   17, 30,
+  //   4,
+  //   {2,3,1,0}, 0,
+  //   3, 7,
+  //   6, 2
+  // };
+ 
+  if(preset==0) {
+    poke_info generated_poke = {
+      (char*)"CHARMANDER", 10,
+      {2,0},
+      5, 4, 20,
+      20, 28,
+      4,
+      {4,2,0,0}, 0,
+      3, 7,
+      6, 2
+    };
+    return generated_poke;
+  } else if(preset==1) {
+    poke_info generated_poke = {
+      (char*)"STARLY", 6,
+      {1,0},
+      28, 98, 132,
+      17, 30,
+      4,
+      {2,3,1,0}, 0,
+      3, 7,
+      6, 2
+    };
+    return generated_poke;
+  }
+
+  // If preset not recognised, default to null pokemon
+  poke_info null_pokemon = {
+    (char*)"", 0,   // <-- This 0 length name indicates a NULL poke (empty space)
+    {0,0},
+    0, 0, 0,
+    0, 0,
+    0,
+    {0,0,0,0}, 0,
+    0, 0,
+    0, 0
+  };
+  return null_pokemon;
 }
 
 void switch_to_roam(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
@@ -1072,7 +1198,7 @@ void switch_to_roam(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_st
   // Roam mode
   *battle_mode = 3;
 }
-void switch_to_battle(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
+void switch_to_battle(poke_info *hostile_pokemon, uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
   /*
   . Resets all the battle parameters and chanegs the game state to work for battling mode
   */
@@ -1085,7 +1211,7 @@ void switch_to_battle(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_
   // Battle mode
   *battle_mode = 0;
   // Setup opponent
-  //### pass ###
+  *hostile_pokemon = generate_pokemon(1);
 }
 
 
@@ -1176,8 +1302,8 @@ int main()
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     1, 0, 2, 2, 2, 0, 0, 3, 0, 1,
-    1, 0, 2, 2, 2, 0, 0, 0, 0, 1,
-    1, 0, 2, 2, 2, 0, 0, 0, 0, 1,
+    1, 0, 2, 2, 0, 0, 0, 0, 0, 1,
+    1, 0, 2, 0, 2, 0, 0, 0, 0, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
@@ -1205,16 +1331,17 @@ int main()
   uint8_t poke_bag[5] = {0, 0, 0, 0, 0};
 
   // Poke setup
-  poke_info starter_pokemon = {
-    (char*)"CHARMANDER", 10,
-    {2,0},
-    5, 4, 20,
-    20, 28,
-    4,
-    {4,2,0,0}, 0,
-    3, 7,
-    6, 2
-  };
+  poke_info starter_pokemon = generate_pokemon(0);
+  // poke_info starter_pokemon = {
+  //   (char*)"CHARMANDER", 10,
+  //   {2,0},
+  //   5, 4, 20,
+  //   20, 28,
+  //   4,
+  //   {4,2,0,0}, 0,
+  //   3, 7,
+  //   6, 2
+  // };
   poke_info null_pokemon = {
     (char*)"", 0,   // <-- This 0 length name indicates a NULL poke (empty space)
     {0,0},
@@ -1230,16 +1357,17 @@ int main()
 
 
   // ### CHANGE TO A PARTY OF HOSTILES -> FOR WILD ENCOUNTERS JUST TREAT AS PARTY OF 1 ###
-  poke_info hostile_pokemon = {
-    (char*)"STARLY", 6,
-    {1,0},
-    28, 98, 132,
-    17, 30,
-    4,
-    {2,3,1,0}, 0,
-    3, 7,
-    6, 2
-  };
+  poke_info hostile_pokemon = generate_pokemon(1);
+  // poke_info hostile_pokemon = {
+  //   (char*)"STARLY", 6,
+  //   {1,0},
+  //   28, 98, 132,
+  //   17, 30,
+  //   4,
+  //   {2,3,1,0}, 0,
+  //   3, 7,
+  //   6, 2
+  // };
 
   // **Note; Set to large initial value like 100 to leave space for possible large strings in the future + empty space
   char* battle_log_complete[100];                // Update only when needed; stores the full battle log resultant text and is spliced later; DO NOT fetch raw each time; battle-log will lerp off this stored result
@@ -1276,7 +1404,7 @@ int main()
     }
     if(battle_mode==3) {    // Roam Screen
       display_roam_screen(&timer, terrain, terrain_width, terrain_height, tile_hwidth, player_coordinates);
-      calculate_roam_screen(terrain, terrain_width, terrain_height, player_coordinates, &battle_log_stage_length, &battle_outcome_stage, &battle_outcome_timer, &hovered_battle_option, &battle_screen_variant, &battle_mode);
+      calculate_roam_screen(terrain, terrain_width, terrain_height, player_coordinates, &hostile_pokemon, &battle_log_stage_length, &battle_outcome_stage, &battle_outcome_timer, &hovered_battle_option, &battle_screen_variant, &battle_mode);
     }
     timer++;
 

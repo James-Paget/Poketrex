@@ -58,6 +58,10 @@ void concat_strings(char* strings[], uint8_t string_number, uint8_t *lengths, ui
 uint8_t sum_256(uint8_t *list, uint8_t list_length);
 int8_t linear_to_oscil(uint8_t x);
 
+void display_tree(int8_t origin_y, int8_t origin_x, uint8_t radius);
+void display_grass(int8_t origin_y, int8_t origin_x, uint8_t radius);
+void display_healstation(int8_t origin_y, int8_t origin_x, uint8_t radius);
+
 void display_cube(int8_t origin_y, int8_t origin_x, uint8_t radius);
 void display_rect(int8_t origin_y, int8_t origin_x, uint8_t hheight, uint8_t hwidth);
 
@@ -94,6 +98,10 @@ void display_roam_screen(uint8_t *timer, uint8_t *terrain, uint8_t terrain_width
 void display_roam_screen_terrain(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t tile_hwidth, uint8_t player_coordinates[2]);
 void display_roam_screen_player(uint8_t tile_hwidth);
 uint8_t resolve_terrain_action(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t position[2]);
-void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t player_coordinates[2], uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode);
+void resolve_terrain_display(uint8_t tile_type, int8_t draw_position_y, int8_t draw_position_x, uint8_t tile_hwidth);
+void calculate_roam_screen(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t player_coordinates[2], poke_info *hostile_pokemon, uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode);
+
+poke_info generate_pokemon(uint8_t preset);
+
 void switch_to_roam(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode);
-void switch_to_battle(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode);
+void switch_to_battle(poke_info *hostile_pokemon, uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode);
