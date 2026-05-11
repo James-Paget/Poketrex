@@ -17,6 +17,8 @@ typedef struct {   // All information about a specific stored pokemon
   // NOTE**; PP not implemented yet
   uint8_t moves[4];     // Index of moves owned by this pokemon -> found via a lookup with the index
   uint8_t active_move;  // Index of the move chosen to be used by the pokemon -> must be in [0,4)
+  uint8_t is_critical;  // 0 => not critical, 1 => is critical, for this turn
+  uint8_t is_miss;      // 0 => has NOT missed, 1 => has missed, for this turn
 
   uint8_t attack;
   uint8_t special_attack;
@@ -65,7 +67,8 @@ void display_healstation(int8_t origin_y, int8_t origin_x, uint8_t radius);
 void display_cube(int8_t origin_y, int8_t origin_x, uint8_t radius);
 void display_rect(int8_t origin_y, int8_t origin_x, uint8_t hheight, uint8_t hwidth);
 
-uint8_t fetch_move_effectiveness(uint8_t move_type, const uint8_t recipient_types[2]);
+uint8_t fetch_move_effectiveness(const uint8_t type_effectiveness_lookup[324], uint8_t move_type, const uint8_t recipient_types[2]);
+uint8_t fetch_move_stab(uint8_t move_type, const uint8_t poke_types[2]);
 
 void display_battle_screen(poke_info *poke_ally, poke_info *poke_hostile, const poke_move *poke_move_lookup, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t battle_mode, uint8_t *timer);
 
@@ -76,16 +79,20 @@ void display_battle_screen_pokemon_stats(poke_info *poke, int8_t position_y, con
 void display_battle_screen_battle_options(uint8_t hovered_option, const uint8_t battle_log_extension, const uint8_t battle_options_hheight, uint8_t *timer);
 void display_battle_screen_battle_options_fight(poke_info *poke, const poke_move *poke_move_lookup, uint8_t hovered_option, const uint8_t battle_log_extension, const uint8_t battle_options_hheight, uint8_t *timer);
 
-void fetch_battle_screen_battle_log(char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer);
+void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer);
 uint8_t fetch_party_fainted_count();
 char* fetch_battle_screen_battle_log_subset(char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t *battle_log_stage, uint8_t *battle_log_timer);
 void display_battle_screen_battle_log(char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, const uint8_t battle_log_extension, const uint8_t battle_options_hheight);
 
-void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, poke_info *poke_ally, poke_info *poke_hostile, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
+void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]);
+void fetch_poke_battle_damage(uint8_t is_A_attacking, const poke_move *poke_move_lookup, poke_info *poke_A, poke_info *poke_B, int8_t *poke_A_counter, int8_t *poke_B_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]);
+void fetch_poke_battle_experience(uint8_t is_A_fainting, poke_info *poke_A, poke_info *poke_B, int8_t *poke_A_counter, int8_t *poke_B_counter, uint8_t *poke_counter_type);
+void set_battle_start_parameters(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
+uint8_t select_random_poke_move(uint8_t moves[4]);
 
-void calculate_battle_screen(char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
-void calculate_battle_screen_battle_timing(char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
-void calculate_battle_screen_buttons(char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
+void calculate_battle_screen(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
+void calculate_battle_screen_battle_timing(char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]);
+void calculate_battle_screen_buttons(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info *poke_ally, poke_info *poke_hostile, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
 
 void display_battle_screen_bag();
 void calculate_battle_screen_bag(uint8_t *battle_mode);
