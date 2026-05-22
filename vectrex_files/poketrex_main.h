@@ -16,7 +16,7 @@ typedef struct {   // All information about a specific stored pokemon
 
   // NOTE**; PP not implemented yet
   uint8_t moves[4];     // Index of moves owned by this pokemon -> found via a lookup with the index
-  uint8_t active_move;  // Index of the move chosen to be used by the pokemon -> must be in [0,4)
+  uint8_t action;       // Decision of pokemon in combat; for [0,4)=Index of the move chosen to be used by the pokemon, [4, 10)=Switch with another poke (value-4th index of poke), 6=...
   uint8_t is_critical;  // 0 => not critical, 1 => is critical, for this turn
   uint8_t is_miss;      // 0 => has NOT missed, 1 => has missed, for this turn
 

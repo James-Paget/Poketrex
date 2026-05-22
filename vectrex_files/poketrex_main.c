@@ -431,12 +431,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
         const char *str_additions[3] = {
           (poke_first->name),
           (char*)" USED ",
-          (poke_move_lookup[poke_first->moves[(poke_first->active_move)]].name),
+          (poke_move_lookup[poke_first->moves[(poke_first->action)]].name),
         };
         const uint8_t str_addition_lengths[3] = {
           (poke_first->name_length),
           6,
-          (poke_move_lookup[poke_first->moves[(poke_first->active_move)]].name_length),
+          (poke_move_lookup[poke_first->moves[(poke_first->action)]].name_length),
         };
         concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
       } else { *battle_log_stage_length = 0; }
@@ -449,7 +449,7 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       */
       if(poke_first->health > 0) {
         if(poke_first->is_miss != 1) {
-          const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_first->moves[(poke_first->active_move)]].type, poke_second->types);
+          const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_first->moves[(poke_first->action)]].type, poke_second->types);
           if(effectiveness == 0) {
             const uint8_t str_number = 4;
             const char *str_additions[4] = {
@@ -580,12 +580,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
         const char *str_additions[3] = {
           (poke_second->name),
           (char*)" USED ",
-          (poke_move_lookup[poke_second->moves[(poke_second->active_move)]].name),
+          (poke_move_lookup[poke_second->moves[(poke_second->action)]].name),
         };
         const uint8_t str_addition_lengths[3] = {
           (poke_second->name_length),
           6,
-          (poke_move_lookup[poke_second->moves[(poke_second->active_move)]].name_length),
+          (poke_move_lookup[poke_second->moves[(poke_second->action)]].name_length),
         };
         concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
       } else { *battle_log_stage_length = 0; }
@@ -598,7 +598,7 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       */
       if(poke_second->health > 0) {
         if(poke_second->is_miss != 1) {
-          const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_second->moves[(poke_second->active_move)]].type, poke_first->types);
+          const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_second->moves[(poke_second->action)]].type, poke_first->types);
           if(effectiveness == 0) {
             const uint8_t str_number = 4;
             const char *str_additions[4] = {
@@ -872,26 +872,32 @@ void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, const poke_move
 
   . Ally/hostile counter values may show a positive or negative change
   */
-  // ###
-  // ### USE ALLY AND HOSTILE DATA TO DETERMINE TOTAL CHANGE
-  // ###
-  // ###
-  // ### FIND HOSTILE vs ALLY into FIRST vs SECOND
-  // ###
   uint8_t is_ally_fainting = 0;
+  poke_info *poke_first;
+  poke_info *poke_second;
+  int8_t *poke_first_counter;
+  int8_t *poke_second_counter;
+  if( ally_poke_party[*active_ally_poke_index].speed >= hostile_poke_party[*active_hostile_poke_index].speed ) {
+    poke_first = &(ally_poke_party[*active_ally_poke_index]);
+    poke_second = &(hostile_poke_party[*active_hostile_poke_index]);
+    poke_first_counter = poke_ally_counter;
+    poke_second_counter = poke_hostile_counter;
+  } else {
+    poke_first = &(hostile_poke_party[*active_hostile_poke_index]);
+    poke_second = &(ally_poke_party[*active_ally_poke_index]);
+    poke_first_counter = poke_hostile_counter;
+    poke_second_counter = poke_ally_counter;
+  }
+
   switch(*battle_outcome_stage) {
     case 1:   // HP (first poke move reaction)
-      // ###
-      // ### SHOULD BE FIRST HERE, NOT JUST ALLY, AND SWAPPED FOR OTHER
-      // ###    JUST DO A SPEED CHECK (HAVE WRAPPED IN A FUNC)
-      // ###
-      if(ally_poke_party[*active_ally_poke_index].is_miss != 1) {
-        fetch_poke_battle_damage(1, poke_move_lookup, &(ally_poke_party[*active_ally_poke_index]), &(hostile_poke_party[*active_hostile_poke_index]), poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+      if(poke_first->is_miss != 1) {
+        fetch_poke_battle_damage(1, poke_move_lookup, poke_first, poke_second, poke_first_counter, poke_second_counter, poke_counter_type, type_effectiveness_lookup);
       }
       break;
     case 6:   // HP (second poke move reaction)
-      if(hostile_poke_party[*active_hostile_poke_index].is_miss != 1) {
-        fetch_poke_battle_damage(0, poke_move_lookup, &(ally_poke_party[*active_ally_poke_index]), &(hostile_poke_party[*active_hostile_poke_index]), poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+      if(poke_second->is_miss != 1) {
+        fetch_poke_battle_damage(0, poke_move_lookup, poke_first, poke_second, poke_first_counter, poke_second_counter, poke_counter_type, type_effectiveness_lookup);
       }
       break;
     case 12:   // EXP
@@ -930,25 +936,25 @@ void fetch_poke_battle_damage(uint8_t is_A_attacking, const poke_move *poke_move
   . Set buffer counter values
   */
   if(is_A_attacking == 1) {
-    uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[ poke_A->moves[poke_A->active_move] ].type, poke_B->types );
-    uint8_t STAB = fetch_move_stab(poke_move_lookup[ poke_A->moves[poke_A->active_move] ].type, poke_A->types);
-    uint8_t damage = 
-      (
-        (poke_move_lookup[ poke_A->moves[poke_A->active_move] ].attack)*(1- (poke_B->defence/100)) +
-        (poke_move_lookup[ poke_A->moves[poke_A->active_move] ].special_attack)*(1- (poke_B->special_defence/100))
-      )*(STAB)*(effectiveness/2);
+    uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[ poke_A->moves[poke_A->action] ].type, poke_B->types );
+    uint8_t STAB = fetch_move_stab(poke_move_lookup[ poke_A->moves[poke_A->action] ].type, poke_A->types);
+    uint8_t damage = poke_move_lookup[ poke_A->moves[poke_A->action] ].attack;
+      // (
+      //   (poke_move_lookup[ poke_A->moves[poke_A->action] ].attack)*(1- (poke_B->defence/100)) +
+      //   (poke_move_lookup[ poke_A->moves[poke_A->action] ].special_attack)*(1- (poke_B->special_defence/100))
+      // )*(STAB)*(effectiveness/2);
 
     *poke_A_counter = 0;
     *poke_B_counter = -damage;
     *poke_counter_type = 1;
   } else {
-    uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[ poke_A->moves[poke_A->active_move] ].type, poke_B->types );
-    uint8_t STAB = fetch_move_stab(poke_move_lookup[ poke_A->moves[poke_A->active_move] ].type, poke_A->types);
-    uint8_t damage = 
-      (
-        (poke_move_lookup[ poke_B->moves[poke_B->active_move] ].attack)*(1- (poke_A->defence/100)) +
-        (poke_move_lookup[ poke_B->moves[poke_B->active_move] ].special_attack)*(1- (poke_A->special_defence/100))
-      )*(STAB)*(effectiveness/2);
+    uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[ poke_B->moves[poke_B->action] ].type, poke_A->types );
+    uint8_t STAB = fetch_move_stab(poke_move_lookup[ poke_B->moves[poke_B->action] ].type, poke_B->types);
+    uint8_t damage = poke_move_lookup[ poke_B->moves[poke_B->action] ].attack;
+      // (
+      //   (poke_move_lookup[ poke_B->moves[poke_B->action] ].attack)*(1- (poke_A->defence/100)) +
+      //   (poke_move_lookup[ poke_B->moves[poke_B->action] ].special_attack)*(1- (poke_A->special_defence/100))
+      // )*(STAB)*(effectiveness/2);
     *poke_A_counter = -damage;
     *poke_B_counter = 0;
     *poke_counter_type = 1;
@@ -967,14 +973,14 @@ void set_battle_start_parameters(const uint8_t type_effectiveness_lookup[324], c
   poke_info *poke_ally = &(ally_poke_party[*active_ally_poke_index]);
   poke_info *poke_hostile = &(hostile_poke_party[*active_hostile_poke_index]);
   // Queue up move for ally
-  poke_ally->active_move = *hovered_battle_option;
+  poke_ally->action = *hovered_battle_option;
   if(rand() < 1638) { poke_ally->is_critical = 1; } else { poke_ally->is_critical = 0; }  //~5% chance
-  if(rand() > 128*(uint16_t)poke_move_lookup[ poke_ally->moves[poke_ally->active_move] ].probability) { poke_ally->is_miss = 1; } else { poke_ally->is_miss = 0; }
+  if(rand() > 128*(uint16_t)poke_move_lookup[ poke_ally->moves[poke_ally->action] ].probability) { poke_ally->is_miss = 1; } else { poke_ally->is_miss = 0; }
 
   // Queue up move for hostile
-  poke_hostile->active_move = select_random_poke_move(poke_hostile->moves);
+  poke_hostile->action = select_random_poke_move(poke_hostile->moves);
   if(rand() < 1638) { poke_hostile->is_critical = 1; } else { poke_hostile->is_critical = 0; }  //~5% chance
-  if(rand() > 128*(uint16_t)poke_move_lookup[ poke_hostile->moves[poke_hostile->active_move] ].probability) { poke_hostile->is_miss = 1; } else { poke_hostile->is_miss = 0; }
+  if(rand() > 128*(uint16_t)poke_move_lookup[ poke_hostile->moves[poke_hostile->action] ].probability) { poke_hostile->is_miss = 1; } else { poke_hostile->is_miss = 0; }
   
   // Queue up *hovered_battle_option index move IF IS VALID
   *battle_screen_variant = 2;   // So the options are removed (since 1 is the max)
@@ -1056,10 +1062,16 @@ void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *batt
   poke_info *poke_ally = &(ally_poke_party[*active_ally_poke_index]);
   poke_info *poke_hostile = &(hostile_poke_party[*active_hostile_poke_index]);
   if(*battle_outcome_timer>128) {
+    // ### LEGACY ###
+    // int8_t ally_counter_step    = (uint8_t)(*poke_ally_counter /(256 -(uint16_t)*battle_outcome_timer)) +ally_counter_step_offset;         // The increment change each frame
+    // int8_t hostile_counter_step = (uint8_t)(*poke_hostile_counter /(256 -(uint16_t)*battle_outcome_timer)) +hostile_counter_step_offset;   // "" ""
+    
+    // Min of 1 tick per frame, overwise scale with amount of counters to be applied (which is then limited to 0 later)
     int8_t ally_counter_step_offset    = (*poke_ally_counter > 0) ? 1 : -1;
     int8_t hostile_counter_step_offset = (*poke_hostile_counter > 0) ? 1 : -1;
-    int8_t ally_counter_step    = (uint8_t)(*poke_ally_counter /(256 -(uint16_t)*battle_outcome_timer)) +ally_counter_step_offset;         // The increment change each frame
-    int8_t hostile_counter_step = (uint8_t)(*poke_hostile_counter /(256 -(uint16_t)*battle_outcome_timer)) +hostile_counter_step_offset;   // "" ""
+    int8_t ally_counter_step    = (int8_t)( (int16_t)(*poke_ally_counter)*timer_speed/128 ) +ally_counter_step_offset;
+    int8_t hostile_counter_step = (int8_t)( (int16_t)(*poke_ally_counter)*timer_speed/128 ) +hostile_counter_step_offset;
+
     switch(*poke_counter_type) {
       case 1:   // HP
         // Ensure the step is bounded correctly
@@ -1501,8 +1513,20 @@ void generate_pokemon(poke_info poke_party[6], uint8_t poke_index, uint8_t prese
       {1,0},
       28, 98, 132,
       17, 30,
-      4,
+      3,
       {2,3,1,0}, 0, 0, 0,
+      3, 7,
+      6, 2
+    };
+    poke_party[poke_index] = generated_poke;
+  } else if(preset==3) {
+    poke_info generated_poke = {
+      (char*)"SPEEDSTER", 9,
+      {1,0},
+      28, 98, 132,
+      17, 30,
+      6,
+      {3,2,1,0}, 0, 0, 0,
       3, 7,
       6, 2
     };
@@ -1596,7 +1620,7 @@ void switch_to_battle(poke_info hostile_poke_party[6], uint8_t *active_hostile_p
       (char*)"EMBER",   // Name
       5,    // Name Length
       2,    // Type
-      0,    // Attack
+      10,    // Attack
       7,    // Special Attack
       255   // Probability
     },
@@ -1709,7 +1733,7 @@ int main()
   uint8_t active_ally_poke_index = 0;
   uint8_t active_hostile_poke_index = 0;
   generate_pokemon(ally_poke_party, 0, 1);
-  generate_pokemon(ally_poke_party, 1, 0);
+  generate_pokemon(ally_poke_party, 1, 2);
   generate_pokemon(ally_poke_party, 2, 0);
   generate_pokemon(ally_poke_party, 3, 0);
   generate_pokemon(ally_poke_party, 4, 0);
@@ -1782,12 +1806,6 @@ int main()
 };
 
 /*
-###
-### Need to fix counters not working with new timer_speed ->
-### Also need to fix health bar visual drop -> Flickers then applys/applys wrong?
-###
-
-
 ====
 TODO
 ====
