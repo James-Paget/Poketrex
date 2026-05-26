@@ -2,7 +2,7 @@
 #define POKE_INFO_H
 
 typedef struct {   // All information about a specific stored pokemon
-  const char *name;
+  const char name[5];
   const uint8_t name_length;
   const uint8_t types[2];
 
@@ -33,7 +33,7 @@ typedef struct {   // All information about a specific stored pokemon
 #define POKE_MOVE_H
 
 typedef struct {   // All information about a specific stored pokemon
-  const char *name;
+  const char *name;   // **NOTE; Lots of runtime errors when trying this as 'const char name[XX]' due to initialisation problems -> will only work like this on the stack in my experience
   const uint8_t name_length;
 
   const uint8_t type;   // e.g Grass, Water, Fire, ...
@@ -51,6 +51,7 @@ typedef struct {   // All information about a specific stored pokemon
 typedef struct {
   const char *name;
   const uint8_t name_length;
+  const uint8_t id;     // Used to identify items
   //pass -> Maybe store pointer to function for action of the item?
 } poke_item;
 
@@ -94,12 +95,15 @@ void calculate_battle_screen(const uint8_t type_effectiveness_lookup[324], char 
 void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]);
 void calculate_battle_screen_buttons(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
 
-void display_battle_screen_bag();
-void calculate_battle_screen_bag(uint8_t *battle_mode);
+void display_battle_screen_bag(const poke_item *poke_item_lookup, uint8_t *poke_bag, uint8_t *poke_bag_size, uint8_t *hovered_bag_index, uint8_t *timer);
+void display_battle_screen_bag_element(const poke_item *item, uint8_t poke_item_position_index, uint8_t *hovered_bag_index, uint8_t hheight, uint8_t hwidth);
+void display_battle_screen_bag_element_closeup(const poke_item *hovered_item, uint8_t hheight, uint8_t hwidth);
+void calculate_battle_screen_bag(const uint8_t type_effectiveness_lookup[324], const poke_move *poke_move_lookup, uint8_t *battle_mode, uint8_t *hovered_bag_index, uint8_t *poke_bag_size, uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type);
 
 void display_battle_screen_pokeswitch_screen(poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, uint8_t hovered_pokeswitch, uint8_t timer);
 void display_battle_screen_pokeswitch_poke_details(poke_info *poke, int8_t origin_y, int8_t origin_x, uint8_t screen_hheight, uint8_t screen_hwidth);
-void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, uint8_t *battle_mode);
+void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, const poke_move *poke_move_lookup, const uint8_t type_effectiveness_lookup[324], int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer);
+uint8_t fetch_pokeswitch_valid(poke_info *poke_switch_target);
 
 void display_roam_screen(uint8_t *timer, uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t tile_hwidth, uint8_t player_coordinates[2]);
 void display_roam_screen_terrain(uint8_t *terrain, uint8_t terrain_width, uint8_t terrain_height, uint8_t tile_hwidth, uint8_t player_coordinates[2]);
