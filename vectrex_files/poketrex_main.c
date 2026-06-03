@@ -157,7 +157,7 @@ uint8_t fetch_move_effectiveness(const uint8_t type_effectiveness_lookup[324], u
 // -------------------
 // -- BATTLE_SCREEN --
 // -------------------
-void display_battle_screen(poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, const poke_move *poke_move_lookup, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t battle_mode, uint8_t *timer) {
+void display_battle_screen(poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, const poke_move *poke_move_lookup, uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t battle_mode, uint8_t *timer) {
   /*
   . Displays the battle screen which consists of;
     . Sprites for both pokemon
@@ -379,7 +379,7 @@ void display_battle_screen_battle_options_fight(poke_info *poke, const poke_move
 };
 
 
-void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer) {
+void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, const poke_item *battle_item, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer) {
   /*
   . Gets the entire battle log for both poke sides in one long string
   . Also updates the battle_log_stage_length with the number of characters in each subset of this entire string to get the log for each stage
@@ -388,29 +388,31 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
   . Note; If a stage has a subset length of 0 then the stage can be skipped immediately
 
   The battle log is constructed in the following order
-  (1) Switch ally pokemon
-  (2) Switch hostile pokemon
+  (1) Declare catching poke
+  (2) Catching shake 1  -> Tracked with existing counters
+  (3) Catching shake 2
+  (4) Catching shake 3
+  (5) Poke has been caught
+  (6) Poke has escaped
 
-  (3) Move name statement (damage dealt in 2nd half)
-  (4) Effectiveness
-  (5) Critical hit
-  (6) Missed hit
-  ### Status triggers to be added in the future ###
-  Repeated for the first and second pokemon
+  (7) Healed poke with potion
 
-  Triggers only if a poke dies;
-    If an ally dies:
-    (11) Death message
-    (12) Experience gain
-    (13) EITHER
-      Select new poke prompt
-      OR
-      Black out prompt
-    
-    If a hostile dies:
-    (11) Death message
-    (12) Experience gain
-    (13) Leave battle       ### WILL NEED TO CHANGE IF NON-SINGLE BATTLES ARE INTRODUCED ###
+  (8) Switch ally pokemon
+  (9) Switch hostile pokemon
+
+    For Ally Poke
+  (10) Move name statement (damage dealt in 2nd half)
+  (11) Effectiveness
+  (12) Critical hit
+  (13) Missed hit
+  (14) Status effects ### NOT IMPLEMENTED YET ###
+  
+  (15), (16), (17), (18), (19); Repeated above for hostile poke 
+
+  (20) Death of either
+  (21) Experience message on faint
+  (22) Captured poke final message (leaves combat after this)
+  (23) Continuing battle
   */
   poke_info *poke_first;
   poke_info *poke_second;
@@ -423,12 +425,162 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
   }
 
   switch(*battle_outcome_stage) {
+    // Use items (ally)
     case 1: {
+      /*
+      --> If a pokeball has been thrown
+      E.G. A POKEBALL HAS BEEN THROWN!
+      */
+      if( (battle_item->category==1) ) {  // If an item has been used
+        const uint8_t str_number = 5;
+        const char *str_additions[5] = {
+          "A ",
+          (char*)(battle_item->name),
+          " HAS ",
+          "BEEN ",
+          "THROWN!",
+        };
+        const uint8_t str_addition_lengths[5] = {
+          2,
+          (battle_item->name_length),
+          5,
+          5,
+          7,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 2: {
+      /*
+      --> Shake 1 for pokeball catch
+      E.G. ... (Shake 1)
+
+      . Here, ally_poke_counter counts the number of shakes (where 3+ => catch)
+      */
+      if( (battle_item->category==1) && (hostile_poke_party[*active_hostile_poke_index].shake_state>=1) ) {
+        const uint8_t str_number = 1;
+        const char *str_additions[1] = {
+          "...",
+        };
+        const uint8_t str_addition_lengths[1] = {
+          3,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 3: {
+      /*
+      --> Shake 2 for pokeball catch
+      E.G. ... (Shake 2)
+      */
+      if( (battle_item->category==1) && (hostile_poke_party[*active_hostile_poke_index].shake_state>=2) ) {
+        const uint8_t str_number = 1;
+        const char *str_additions[1] = {
+          "...",
+        };
+        const uint8_t str_addition_lengths[1] = {
+          3,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 4: {
+      /*
+      --> Shake 3 for pokeball catch
+      E.G. ... (Shake 3)
+      */
+      if( (battle_item->category==1) && (hostile_poke_party[*active_hostile_poke_index].shake_state>=3) ) {
+        const uint8_t str_number = 1;
+        const char *str_additions[1] = {
+          "...",
+        };
+        const uint8_t str_addition_lengths[1] = {
+          3,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 5: {
+      /*
+      --> Caught poke in pokeball
+      E.G. CHARMANDER HAS BEEN CAUGHT!
+      */
+      if( (battle_item->category==1) && (hostile_poke_party[*active_hostile_poke_index].shake_state>=3) ) {
+        const uint8_t str_number = 4;
+        const char *str_additions[4] = {
+          (char*)(hostile_poke_party[*active_hostile_poke_index].name),
+          " HAS ",
+          "BEEN ",
+          "CAUGHT!",
+        };
+        const uint8_t str_addition_lengths[4] = {
+          (hostile_poke_party[*active_hostile_poke_index].name_length),
+          5,
+          5,
+          7,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 6: {
+      /*
+      --> NOT caught poke in pokeball
+      E.G. CHARMANDER ESCAPED!
+      */
+      if( (battle_item->category==1) && (hostile_poke_party[*active_hostile_poke_index].shake_state<3) ) {
+        const uint8_t str_number = 2;
+        const char *str_additions[2] = {
+          (char*)(hostile_poke_party[*active_hostile_poke_index].name),
+          " ESCAPED!",
+        };
+        const uint8_t str_addition_lengths[2] = {
+          (hostile_poke_party[*active_hostile_poke_index].name_length),
+          9,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+
+    // Healing items
+    case 7: {
+      /*
+      --> Potion of varying type is used
+      E.G. CHARMANDER USED A POTION
+      */
+      if(battle_item->category==2) {
+        const uint8_t str_number = 5;
+        const char *str_additions[5] = {
+          (char*)(ally_poke_party[*active_ally_poke_index].name),
+          "USED ",
+          "A ",
+          (char*)(battle_item->name),
+          "POTION",
+        };
+        const uint8_t str_addition_lengths[5] = {
+          (ally_poke_party[*active_ally_poke_index].name_length),
+          5,
+          2,
+          (battle_item->name_length),
+          6,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+
+    // Switching pokes (ally+hostile)
+    case 8: {
       /*
       --> If swapping out an allied poke
       E.G. SWAPPING CHARMANDER WITH STARLY
       */
-      if( (4 <= ally_poke_party[*active_ally_poke_index].action) && (ally_poke_party[*active_ally_poke_index].action < 10) ) {
+      if( (4 <= ally_poke_party[*active_ally_poke_index].action) && (ally_poke_party[*active_ally_poke_index].action < 10) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         const uint8_t str_number = 4;
         const char *str_additions[4] = {
           "SWAPPING ",
@@ -446,12 +598,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 2: {
+    case 9: {
       /*
       --> If swapping out a hostile poke
       E.G. SWAPPING CHARMANDER WITH STARLY
       */
-      if( (4 <= hostile_poke_party[*active_hostile_poke_index].action) && (hostile_poke_party[*active_hostile_poke_index].action < 10) ) {
+      if( (4 <= hostile_poke_party[*active_hostile_poke_index].action) && (hostile_poke_party[*active_hostile_poke_index].action < 10) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         const uint8_t str_number = 4;
         const char *str_additions[4] = {
           "SWAPPING ",
@@ -472,8 +624,8 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
 
 
     // First poke
-    case 3: {
-      if((poke_first->health > 0) && (poke_first->action<4)) {
+    case 10: {
+      if((poke_first->health > 0) && (poke_first->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         /*
         --> Move used by first (fastest) pokemon
         E.G. CHARMANDER USED EMBER
@@ -493,12 +645,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 4: {
+    case 11: {
       /*
       --> Effectiveness of move of first poke on second poke
       E.G. IT WAS SUPER EFFECTIVE!
       */
-      if((poke_first->health > 0) && (poke_first->action<4)) {
+      if((poke_first->health > 0) && (poke_first->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         if(poke_first->is_miss != 1) {
           const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_first->moves[(poke_first->action)]].type, poke_second->types);
           if(effectiveness == 0) {
@@ -556,12 +708,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 5: {
+    case 12: {
       /*
       --> Was the move a critical hit
       E.G. IT WAS A CRITICAL HIT!
       */
-      if((poke_first->health > 0) && (poke_first->action<4)) {
+      if((poke_first->health > 0) && (poke_first->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         if(poke_first->is_miss != 1) {
           if(poke_first->is_critical == 1) {
             const uint8_t str_number = 5;
@@ -585,13 +737,13 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 6: {
+    case 13: {
       /*
       --> If move missed
       E.G. IT MISSED!
       */
       if(poke_first->health > 0) {
-        if(poke_first->is_miss == 1) {
+        if( (poke_first->is_miss == 1) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
           const uint8_t str_number = 2;
           const char *str_additions[2] = {
             "IT ",
@@ -606,8 +758,8 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 7: {
-      if((poke_first->health > 0) && (poke_first->action<4)) {
+    case 14: {
+      if((poke_first->health > 0) && (poke_first->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
 
         // ###
         // ### NO BEHAVIOUR NEEDED HERE YET => IGNORE
@@ -623,8 +775,8 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
 
 
     // Second poke
-    case 8: {
-      if((poke_second->health > 0) && (poke_second->action<4)) {
+    case 15: {
+      if((poke_second->health > 0) && (poke_second->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         /*
         --> Move used by second (slower) pokemon
         E.G. CHARMANDER USED EMBER
@@ -644,12 +796,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 9: {
+    case 16: {
       /*
       --> Effectiveness of move of second poke on first poke
       E.G. IT WAS SUPER EFFECTIVE!
       */
-      if((poke_second->health > 0) && (poke_second->action<4)) {
+      if((poke_second->health > 0) && (poke_second->action<4) && (battle_item->category==0) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         if(poke_second->is_miss != 1) {
           const uint8_t effectiveness = fetch_move_effectiveness(type_effectiveness_lookup, poke_move_lookup[poke_second->moves[(poke_second->action)]].type, poke_first->types);
           if(effectiveness == 0) {
@@ -707,12 +859,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 10: {
+    case 17: {
       /*
       --> Was the move a critical hit
       E.G. IT WAS A CRITICAL HIT!
       */
-      if((poke_second->health > 0) && (poke_second->action<4)) {
+      if((poke_second->health > 0) && (poke_second->action<4) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         if(poke_second->is_miss != 1) {
           if(poke_second->is_critical == 1) {
             const uint8_t str_number = 5;
@@ -736,12 +888,12 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 11: {
+    case 18: {
       /*
       --> If move missed
       E.G. IT MISSED!
       */
-      if((poke_second->health > 0) && (poke_second->action<4)) {
+      if((poke_second->health > 0) && (poke_second->action<4) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
         if(poke_second->is_miss == 1) {
           const uint8_t str_number = 2;
           const char *str_additions[2] = {
@@ -757,8 +909,8 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 12: {
-      if((poke_second->health > 0) && (poke_second->action<4)) {
+    case 19: {
+      if((poke_second->health > 0) && (poke_second->action<4) && (hostile_poke_party[*active_hostile_poke_index].shake_state < 3) ) {
 
         // ###
         // ### NO BEHAVIOUR NEEDED HERE YET => IGNORE
@@ -773,7 +925,7 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
     }
 
     // When either poke is dead, new triggers
-    case 13: {  // Death message
+    case 20: {  // Death message
       *battle_log_stage_length = 0;   // Default to not occur
       if(poke_first->health <= 0) {
         const uint8_t str_number = 2;
@@ -800,7 +952,7 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 14: {  // Experience message
+    case 21: {  // Experience message
       *battle_log_stage_length = 0;   // Default to not occur
       if(poke_first->health <= 0) {
         const uint8_t str_number = 3;
@@ -831,7 +983,22 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
       } else { *battle_log_stage_length = 0; }
       break;
     }
-    case 15: {  // Post-death trigger
+    case 22: {  // Captured poke final message
+      if( (hostile_poke_party[*active_hostile_poke_index].shake_state >= 3) ) {
+        const uint8_t str_number = 2;
+        const char *str_additions[2] = {
+          "POKE ",
+          "CAPTURED!"
+        };
+        const uint8_t str_addition_lengths[2] = {
+          5,
+          9,
+        };
+        concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
+      } else { *battle_log_stage_length = 0; }
+      break;
+    }
+    case 23: {  // Post-death trigger
 
       const uint8_t str_number = 2;
       const char *str_additions[2] = {
@@ -843,16 +1010,6 @@ void fetch_battle_screen_battle_log(const uint8_t type_effectiveness_lookup[324]
         6,
       };
       concat_strings(battle_log_complete, battle_log_stage_length, str_number, str_additions, str_addition_lengths);
-
-
-      // // *battle_log_stage_length = 0;   // Default to not occur
-      // if(poke_first->health <= 0) {
-      //   // *battle_log_complete = (char*)"POKE FIRST DEAD, 13";
-      //   // *battle_log_stage_length = 19;
-      // } else if(poke_second->health <= 0) {
-      //   // *battle_log_complete = (char*)"POKE SECOND DEAD, 13";
-      //   // *battle_log_stage_length = 20;
-      // } else { *battle_log_stage_length = 0; }
       break;
     }
   }
@@ -912,7 +1069,7 @@ void display_battle_screen_battle_log(char *battle_log_complete, uint8_t *battle
 };
 
 
-void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]) {
+void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324], uint8_t *battle_item_index) {
   /*
   . Returns the counter type and values for counters required on this stage of the battle animation
   . This includes damage, experience, etc recieved by both parties
@@ -933,34 +1090,52 @@ void fetch_battle_screen_counters(uint8_t *battle_outcome_stage, const poke_move
   if( ally_poke_party[*active_ally_poke_index].speed >= hostile_poke_party[*active_hostile_poke_index].speed ) {
     poke_first = &(ally_poke_party[*active_ally_poke_index]);
     poke_second = &(hostile_poke_party[*active_hostile_poke_index]);
-    poke_first_counter = poke_ally_counter;
-    poke_second_counter = poke_hostile_counter;
+    poke_first_counter = ally_poke_counter;
+    poke_second_counter = hostile_poke_counter;
   } else {
     poke_first = &(hostile_poke_party[*active_hostile_poke_index]);
     poke_second = &(ally_poke_party[*active_ally_poke_index]);
-    poke_first_counter = poke_hostile_counter;
-    poke_second_counter = poke_ally_counter;
+    poke_first_counter = hostile_poke_counter;
+    poke_second_counter = ally_poke_counter;
   }
 
   switch(*battle_outcome_stage) {
-    case 3:   // HP (first poke move reaction)
+    // ### LEGACY -> HANDLED THROUGH SHAKE STATE DIRECTLY NOW NOT USING COUNTERS ###
+    // **NOTE; This capture check only occurs for PLAYER capturing the HOSTILE; never vice versa -> May want to generalise in future
+    // case 2:   // Shake 1, roll for pokeball escape
+    //   *ally_poke_counter = hostile_poke_party[*active_hostile_poke_index].shake_state;
+    //   break;
+    // case 3:   // Shake 2, roll for pokeball escape
+    //   *ally_poke_counter = hostile_poke_party[*active_hostile_poke_index].shake_state;
+    //   break;
+    // case 4:   // Shake 3, roll for pokeball escape
+    //   *ally_poke_counter = hostile_poke_party[*active_hostile_poke_index].shake_state;
+    //   break;
+    // case 5:   // Capture
+    //   *ally_poke_counter = hostile_poke_party[*active_hostile_poke_index].shake_state;
+    //   break;
+    // case 6:   // Escape
+    //   *ally_poke_counter = hostile_poke_party[*active_hostile_poke_index].shake_state;
+    //   break;
+
+    case 10:   // HP (first poke move reaction)
       if(poke_first->is_miss != 1) {
         fetch_poke_battle_damage(1, poke_move_lookup, poke_first, poke_second, poke_first_counter, poke_second_counter, poke_counter_type, type_effectiveness_lookup);
       }
       break;
-    case 8:   // HP (second poke move reaction)
+    case 15:   // HP (second poke move reaction)
       if(poke_second->is_miss != 1) {
         fetch_poke_battle_damage(0, poke_move_lookup, poke_first, poke_second, poke_first_counter, poke_second_counter, poke_counter_type, type_effectiveness_lookup);
       }
       break;
-    case 14:   // EXP
+    case 21:   // EXP
       if(ally_poke_party[*active_ally_poke_index].health <= 0) { is_ally_fainting = 1; }
-      fetch_poke_battle_experience(is_ally_fainting, &(ally_poke_party[*active_ally_poke_index]), &(hostile_poke_party[*active_hostile_poke_index]), poke_ally_counter, poke_hostile_counter, poke_counter_type);
+      fetch_poke_battle_experience(is_ally_fainting, &(ally_poke_party[*active_ally_poke_index]), &(hostile_poke_party[*active_hostile_poke_index]), ally_poke_counter, hostile_poke_counter, poke_counter_type);
       break;
     default:     // Set to nulls
       *poke_counter_type = 0;
-      *poke_ally_counter = 0;
-      *poke_hostile_counter = 0;
+      *ally_poke_counter = 0;
+      *hostile_poke_counter = 0;
       break;
   }
 }
@@ -1016,7 +1191,7 @@ void fetch_poke_battle_damage(uint8_t is_A_attacking, const poke_move *poke_move
 uint8_t fetch_move_stab(uint8_t move_type, const uint8_t poke_types[2]) {
   return 0;//( (move_type==poke_types[0])||(move_type==poke_types[1]) ) ? 1 : 0;
 }
-void set_battle_start_parameters(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type) {
+void set_battle_start_parameters(const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324], uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type) {
   /*
   . Set required info for a battle combat round to start
   . This is triggered one time, once the player makes a move selection
@@ -1039,8 +1214,8 @@ void set_battle_start_parameters(const uint8_t type_effectiveness_lookup[324], c
   *battle_screen_variant = 2;   // So the options are removed (since 1 is the max)
   *battle_outcome_stage = 1;
   *battle_outcome_timer = 0;
-  fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, battle_outcome_stage, battle_outcome_timer);
-  fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+  fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, &(poke_item_lookup[*battle_item_index]), battle_outcome_stage, battle_outcome_timer);
+  fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, poke_counter_type, type_effectiveness_lookup, battle_item_index);
 }
 uint8_t select_random_poke_move(uint8_t moves[4]) {
   uint8_t valid_moves[4] = {9,9,9,9};   // Changes to the index of valid moves as they are found e.g. {0,2,3,9}, 9 means no valid move has been found (only 0-3 valid)
@@ -1063,16 +1238,16 @@ uint8_t select_random_poke_move(uint8_t moves[4]) {
 }
 
 
-void calculate_battle_screen(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type) {
+void calculate_battle_screen(const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_item_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type) {
   if(*battle_outcome_stage > 0) {     // If beyond stage 0 (e.g. in automatic animation), progress the stages periodically
     // ** NOTE; Set the text speed here through 'timer_speed'
-    calculate_battle_screen_battle_timing(4, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, hovered_battle_option, battle_mode, battle_screen_variant, battle_outcome_stage, battle_outcome_timer, poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+    calculate_battle_screen_battle_timing(4, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, battle_item_index, hovered_battle_option, battle_mode, battle_screen_variant, battle_outcome_stage, battle_outcome_timer, ally_poke_counter, hostile_poke_counter, poke_counter_type, poke_item_lookup, type_effectiveness_lookup);
   } else if(*battle_outcome_stage == 0) {
-    calculate_battle_screen_buttons(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, hovered_battle_option, battle_screen_variant, battle_mode, battle_outcome_stage, battle_outcome_timer, poke_ally_counter, poke_hostile_counter, poke_counter_type);
+    calculate_battle_screen_buttons(poke_item_lookup, type_effectiveness_lookup, battle_item_index, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, hovered_battle_option, battle_screen_variant, battle_mode, battle_outcome_stage, battle_outcome_timer, ally_poke_counter, hostile_poke_counter, poke_counter_type);
   }   // ### COULD ADD A SKIP TEXT BUTTON ###
 }
 
-void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, const uint8_t type_effectiveness_lookup[324]) {
+void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_item_index, uint8_t *hovered_battle_option, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type, const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324]) {
   /*
   . Calculates the battle log to be shown and any changes in state while the battle animation is playing
   . This includes damage taken, experience gained, end of combat, etc while fight takes place
@@ -1088,12 +1263,12 @@ void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *batt
     // One-time calcs as new stage begins
     *battle_outcome_stage = *battle_outcome_stage+1;
     *battle_outcome_timer = 0;
-    fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, battle_outcome_stage, battle_outcome_timer);
-    fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+    fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, &(poke_item_lookup[*battle_item_index]), battle_outcome_stage, battle_outcome_timer);
+    fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, poke_counter_type, type_effectiveness_lookup, battle_item_index);
   }
 
   // Reset battle stages/timers once finished showing
-  if(*battle_outcome_stage > 15) {
+  if(*battle_outcome_stage > 23) {
     *battle_outcome_stage = 0;    // <-- This officially ends the animation
     *battle_outcome_timer = 0;
     *battle_screen_variant = 0;   // <-- This ensures animation is not shown to the player (controls the hiding of the options)
@@ -1104,14 +1279,14 @@ void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *batt
   poke_info *poke_hostile = &(hostile_poke_party[*active_hostile_poke_index]);
   if(*battle_outcome_timer>128) {
     // ### LEGACY ###
-    // int8_t ally_counter_step    = (uint8_t)(*poke_ally_counter /(256 -(uint16_t)*battle_outcome_timer)) +ally_counter_step_offset;         // The increment change each frame
-    // int8_t hostile_counter_step = (uint8_t)(*poke_hostile_counter /(256 -(uint16_t)*battle_outcome_timer)) +hostile_counter_step_offset;   // "" ""
+    // int8_t ally_counter_step    = (uint8_t)(*ally_poke_counter /(256 -(uint16_t)*battle_outcome_timer)) +ally_counter_step_offset;         // The increment change each frame
+    // int8_t hostile_counter_step = (uint8_t)(*hostile_poke_counter /(256 -(uint16_t)*battle_outcome_timer)) +hostile_counter_step_offset;   // "" ""
     
     // Min of 1 tick per frame, overwise scale with amount of counters to be applied (which is then limited to 0 later)
-    int8_t ally_counter_step_offset    = (*poke_ally_counter > 0) ? 1 : -1;
-    int8_t hostile_counter_step_offset = (*poke_hostile_counter > 0) ? 1 : -1;
-    int8_t ally_counter_step    = (int8_t)( (int16_t)(*poke_ally_counter)*timer_speed/128 ) +ally_counter_step_offset;
-    int8_t hostile_counter_step = (int8_t)( (int16_t)(*poke_ally_counter)*timer_speed/128 ) +hostile_counter_step_offset;
+    int8_t ally_counter_step_offset    = (*ally_poke_counter > 0) ? 1 : -1;
+    int8_t hostile_counter_step_offset = (*hostile_poke_counter > 0) ? 1 : -1;
+    int8_t ally_counter_step    = (int8_t)( (int16_t)(*ally_poke_counter)*timer_speed/128 ) +ally_counter_step_offset;
+    int8_t hostile_counter_step = (int8_t)( (int16_t)(*ally_poke_counter)*timer_speed/128 ) +hostile_counter_step_offset;
 
     switch(*poke_counter_type) {
       case 1:   // HP
@@ -1149,22 +1324,30 @@ void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *batt
         // poke_hostile->experience = poke_hostile->experience +hostile_counter_step;   // ** Note; For now, only ally experience matters
         break;
     }
-    *poke_ally_counter = *poke_ally_counter-ally_counter_step;
-    *poke_hostile_counter = *poke_hostile_counter-hostile_counter_step;
+    *ally_poke_counter = *ally_poke_counter-ally_counter_step;
+    *hostile_poke_counter = *hostile_poke_counter-hostile_counter_step;
   }
 
   // Apply separate fixed events
   if(*battle_outcome_timer >= 250) {  // E.G trigger at the end of stage that is being shown
     switch(*battle_outcome_stage) {
-      case 1: // Switching ally poke
+      case 8: // Switching ally poke
         *active_ally_poke_index = ally_poke_party[*active_ally_poke_index].action-4;    // Set the active poke to the one being switched out
         ally_poke_party[*active_ally_poke_index].action = *active_ally_poke_index+4;    // Make the new poke have no active action (so it won't immediately start performing attacks once switched in -> this is done by defaulting to switching to itself, hence not in [0,4) attack range and past its own switch trigger)
         break;
-      case 2: // switching hostile poke
+      case 9: // switching hostile poke
         *active_hostile_poke_index = hostile_poke_party[*active_hostile_poke_index].action-4; // "" ""
         hostile_poke_party[*active_hostile_poke_index].action = *active_hostile_poke_index+4; // "" ""
         break;
-      case 15:
+      case 22:  // When a poke is captured, once stage ends also end the battle
+        /*
+        . Add poke to party (OR box if party is full)
+        . GO back to roam screen
+        */
+        capture_pokemon(ally_poke_party, hostile_poke_party[*active_hostile_poke_index]);
+        switch_to_roam(battle_log_stage_length, battle_outcome_stage, battle_outcome_timer, hovered_battle_option, battle_screen_variant, battle_mode);
+        break;
+      case 23:
         if(poke_hostile->health <= 0) {   // When the hostile dies, will always result in a successful battle + exit
           // ###
           // ### NOTE; THIS WILL NEED CHANGING ONCE NON-WILD BATTLES INTRODUCED
@@ -1187,7 +1370,7 @@ void calculate_battle_screen_battle_timing(const uint8_t timer_speed, char *batt
   }
 }
 
-void calculate_battle_screen_buttons(const uint8_t type_effectiveness_lookup[324], char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type) {
+void calculate_battle_screen_buttons(const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324], uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, const poke_move *poke_move_lookup, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type) {
   /*
   . Button interactions with the battle_screen
   . Currently only takes button input while battle_outcome_stage==0, e.g. When animation for outcome is NOT playing
@@ -1218,7 +1401,7 @@ void calculate_battle_screen_buttons(const uint8_t type_effectiveness_lookup[324
       }
     } else if(*battle_screen_variant == 1) {  // If in MoveOptions variant
       if( poke_move_lookup[ ally_poke_party[*active_ally_poke_index].moves[*hovered_battle_option] ].probability > 0 ) {  // If is a valid move, allow it to be queued
-        set_battle_start_parameters(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, hovered_battle_option, battle_screen_variant, battle_mode, battle_outcome_stage, battle_outcome_timer, poke_ally_counter, poke_hostile_counter, poke_counter_type);
+        set_battle_start_parameters(poke_item_lookup, type_effectiveness_lookup, battle_item_index, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, hovered_battle_option, battle_screen_variant, battle_mode, battle_outcome_stage, battle_outcome_timer, ally_poke_counter, hostile_poke_counter, poke_counter_type);
       } else {  // If the move is invalid, make a battle log message visable
         //pass
       }
@@ -1336,7 +1519,7 @@ void display_battle_screen_pokeswitch_poke_details(poke_info *poke, int8_t origi
   }
 }
 
-void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, const poke_move *poke_move_lookup, const uint8_t type_effectiveness_lookup[324], int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer) {
+void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, const poke_move *poke_move_lookup, const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324], int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, uint8_t *battle_mode, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer) {
   uint8_t buttons = read_buttons();
   if(buttons & JOY1_BTN1_MASK) {    // Cycle pokemon
     *hovered_pokeswitch = (*hovered_pokeswitch+1)%6;
@@ -1354,8 +1537,8 @@ void calculate_battle_screen_pokeswitch(uint8_t *hovered_pokeswitch, const poke_
       *battle_screen_variant = 2;   // So the options are removed (since 1 is the max)
       *battle_outcome_stage = 1;
       *battle_outcome_timer = 0;
-      fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, battle_outcome_stage, battle_outcome_timer);
-      fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+      fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, &(poke_item_lookup[*battle_item_index]), battle_outcome_stage, battle_outcome_timer);
+      fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, poke_counter_type, type_effectiveness_lookup, battle_item_index);
     }
 
     reset_beam();
@@ -1444,7 +1627,7 @@ void display_battle_screen_bag_element_closeup(const poke_item *hovered_item, ui
   }
 }
 
-void calculate_battle_screen_bag(const uint8_t type_effectiveness_lookup[324], const poke_move *poke_move_lookup, uint8_t *battle_mode, uint8_t *hovered_bag_index, uint8_t *poke_bag_size, uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *poke_ally_counter, int8_t *poke_hostile_counter, uint8_t *poke_counter_type) {
+void calculate_battle_screen_bag(const poke_item poke_item_lookup[], const uint8_t type_effectiveness_lookup[324], const poke_move *poke_move_lookup, uint8_t *battle_mode, uint8_t *hovered_bag_index, uint8_t *poke_bag, uint8_t *poke_bag_size, uint8_t *battle_item_index, char *battle_log_complete, uint8_t *battle_log_stage_length, poke_info ally_poke_party[6], uint8_t *active_ally_poke_index, poke_info hostile_poke_party[6], uint8_t *active_hostile_poke_index, uint8_t *battle_screen_variant, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, int8_t *ally_poke_counter, int8_t *hostile_poke_counter, uint8_t *poke_counter_type) {
   uint8_t buttons = read_buttons();
   if(buttons & JOY1_BTN1_MASK) {    // Cycle bag items
     *hovered_bag_index = (*hovered_bag_index +1)%(*poke_bag_size);
@@ -1453,21 +1636,28 @@ void calculate_battle_screen_bag(const uint8_t type_effectiveness_lookup[324], c
     set_scale(128);
   }
   if(buttons & JOY1_BTN2_MASK) {    // Select bag item
-    *battle_item_index = *hovered_bag_index;
-    // ###
-    // ### MAKE SURE THIS DOESN'T UPDATE PREVIOUS SECTION TO 0; NEEDS TO COPY TO NEW ADDRESS THEN RESET THIS ONE
-    // ###
-    *hovered_bag_index = 0;
-    // ###
-    // ### ADD A CHECK IN STAGING TO LOOK FOR POKEBALLS / CATCHING + ADD A COUNTER FOR HEALS HERE + CHECKS FOR IF POKE IS CAUGHT OR NOT (ALLOWED TO BE CAUGHT OR NOT LATER)
-    // ###
+    *battle_item_index = poke_bag[ 2*(*hovered_bag_index) ]; // Get id from poke bag
+    *hovered_bag_index = 0;                                   // Reset hover start (shared with move hover index, hence important to reset each time)
+    
+    // One-time item triggers at each round start
+    switch(poke_item_lookup[poke_bag[2*(*battle_item_index)]].category) {
+      case(1):  // If is a ball item ...
+        // ###
+        // ### ADD RAND IN HERE
+        // ###
+        hostile_poke_party[*active_hostile_poke_index].shake_state = 3;     // Once decision to capture has been made, set a shake state for hostile poke attempting to be captured
+        break;
+      case(2):  // If is a heal item...
+        //pass
+        break;
+    }
 
     *battle_mode = 0;
     *battle_screen_variant = 2;   // So the options are removed (since 1 is the max)
     *battle_outcome_stage = 1;
     *battle_outcome_timer = 0;
-    fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, battle_outcome_stage, battle_outcome_timer);
-    fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, poke_ally_counter, poke_hostile_counter, poke_counter_type, type_effectiveness_lookup);
+    fetch_battle_screen_battle_log(type_effectiveness_lookup, battle_log_complete, battle_log_stage_length, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, &(poke_item_lookup[*battle_item_index]), battle_outcome_stage, battle_outcome_timer);
+    fetch_battle_screen_counters(battle_outcome_stage, poke_move_lookup, ally_poke_party, active_ally_poke_index, hostile_poke_party, active_hostile_poke_index, ally_poke_counter, hostile_poke_counter, poke_counter_type, type_effectiveness_lookup, battle_item_index);
 
     reset_beam();
     print_str_c(0, 0, (char*)"PRESSED 2");
@@ -1636,7 +1826,8 @@ void generate_pokemon(poke_info poke_party[6], uint8_t poke_index, uint8_t prese
       4,
       {4,2,0,0}, 0, 0, 0,
       3, 7,
-      6, 2
+      6, 2,
+      0
     };
     poke_party[poke_index] = generated_poke;
   } else if(preset==2) {
@@ -1648,7 +1839,8 @@ void generate_pokemon(poke_info poke_party[6], uint8_t poke_index, uint8_t prese
       3,
       {2,3,1,0}, 0, 0, 0,
       3, 7,
-      6, 2
+      6, 2,
+      0
     };
     poke_party[poke_index] = generated_poke;
   } else if(preset==3) {
@@ -1660,7 +1852,8 @@ void generate_pokemon(poke_info poke_party[6], uint8_t poke_index, uint8_t prese
       6,
       {3,2,1,0}, 0, 0, 0,
       3, 7,
-      6, 2
+      6, 2,
+      0
     };
     poke_party[poke_index] = generated_poke;
   } else {
@@ -1673,11 +1866,26 @@ void generate_pokemon(poke_info poke_party[6], uint8_t poke_index, uint8_t prese
       0,
       {0,0,0,0}, 0, 0, 0,
       0, 0,
-      0, 0
+      0, 0,
+      0
     };
     poke_party[poke_index] = null_poke;
   }
   
+}
+void capture_pokemon(poke_info target_poke_party[6], poke_info captured_poke) {
+  /*
+  . Adds the captured poke to the target_poke_party if there is space
+  . Adds the captured poke to the pokebox if there is no space in the party ### NOT IMPLEMENTED YET ###
+  */
+  for(uint8_t i=0; i<6; i++) {
+    if(target_poke_party[i].name_length == 0) { // If is a NULL space, e.g. empty, then add the captured_poke here
+      target_poke_party[i] = captured_poke;
+      break;
+    }
+    // Ignore if no space is found FOR NOW
+  }
+  // ### If space is never found, add logic for adding to box instead ###
 }
 
 void switch_to_roam(uint8_t *battle_log_stage_length, uint8_t *battle_outcome_stage, uint8_t *battle_outcome_timer, uint8_t *hovered_battle_option, uint8_t *battle_screen_variant, uint8_t *battle_mode) {
@@ -1762,21 +1970,25 @@ const poke_item poke_item_lookup[] = {   // Retrieve items from an index stored 
     "",   // Name --> Placeholder move to give empty move slot e.g. cannot be used, empty item slot
     0,    // Name Length
     0,    // ID
+    0,    // Category
   },
   {
     "POKEBALL",   // Name
     8,    // Name Length
     1,    // ID
+    1,    // Category
   },
   {
     "GREATBALL",   // Name
     9,    // Name Length
     2,    // ID
+    1,    // Category
   },
   {
     "POTION",   // Name
     6,    // Name Length
     3,    // ID
+    2,    // Category
   },
 };
 // ### MAY NEED LENGTHS FOR EACH OF THESE AS WELL -> STORE IN ADJACENT ARRAY ###
@@ -1912,6 +2124,7 @@ int main()
   // ###
   // ### RENAME THIS TO MAKE MORE SENSE
   // ###  --> WILL NEED TO BE RESET TO 0 EACH TIME FOR SAFETY
+  // ###
   uint8_t hovered_pokeswitch = 0;     // Which pokemon index (in team) is being hovered when in the pokeswitch screen OR the hovered bag item index
   
   uint8_t battle_mode = 3;
@@ -1921,16 +2134,16 @@ int main()
     wait_retrace();
 
     if(battle_mode==0) {    // Fight Screen
-      display_battle_screen(&(ally_poke_party[0]), &active_ally_poke_index, &(hostile_poke_party[0]), &active_hostile_poke_index, poke_move_lookup, battle_log_complete, &battle_log_stage_length, hovered_battle_option, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer, battle_mode, &timer); // ### SHOULD PROBABLY JUST PARSE POINTERS HERE TOO ###
-      calculate_battle_screen(type_effectiveness_lookup, battle_log_complete, &battle_log_stage_length, poke_move_lookup, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, &hovered_battle_option, &battle_screen_variant, &battle_mode, &battle_outcome_stage, &battle_outcome_timer, &temp_counter_1, &temp_counter_2, &temp_counter_3);
+      display_battle_screen(&(ally_poke_party[0]), &active_ally_poke_index, &(hostile_poke_party[0]), &active_hostile_poke_index, poke_move_lookup, &battle_item_index, battle_log_complete, &battle_log_stage_length, hovered_battle_option, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer, battle_mode, &timer); // ### SHOULD PROBABLY JUST PARSE POINTERS HERE TOO ###
+      calculate_battle_screen(poke_item_lookup, type_effectiveness_lookup, battle_log_complete, &battle_log_stage_length, poke_move_lookup, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, &battle_item_index, &hovered_battle_option, &battle_screen_variant, &battle_mode, &battle_outcome_stage, &battle_outcome_timer, &temp_counter_1, &temp_counter_2, &temp_counter_3);
     }
     if(battle_mode==1) {    // Battle Bag Screen
       display_battle_screen_bag(poke_item_lookup, poke_bag, &poke_bag_size, &hovered_pokeswitch, &timer);
-      calculate_battle_screen_bag(type_effectiveness_lookup, poke_move_lookup, &battle_mode, &hovered_pokeswitch, &poke_bag_size, &battle_item_index, battle_log_complete, &battle_log_stage_length, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer, &temp_counter_1, &temp_counter_2, &temp_counter_3);
+      calculate_battle_screen_bag(poke_item_lookup, type_effectiveness_lookup, poke_move_lookup, &battle_mode, &hovered_pokeswitch, poke_bag, &poke_bag_size, &battle_item_index, battle_log_complete, &battle_log_stage_length, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer, &temp_counter_1, &temp_counter_2, &temp_counter_3);
     }
     if(battle_mode==2) {    // Poke-switch Screen
-        display_battle_screen_pokeswitch_screen(ally_poke_party, &active_ally_poke_index, hovered_pokeswitch, timer);
-        calculate_battle_screen_pokeswitch(&hovered_pokeswitch, poke_move_lookup, type_effectiveness_lookup, &temp_counter_1, &temp_counter_2, &temp_counter_3, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, battle_log_complete, &battle_log_stage_length, &battle_mode, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer);
+      display_battle_screen_pokeswitch_screen(ally_poke_party, &active_ally_poke_index, hovered_pokeswitch, timer);
+      calculate_battle_screen_pokeswitch(&hovered_pokeswitch, poke_move_lookup, poke_item_lookup, type_effectiveness_lookup, &temp_counter_1, &temp_counter_2, &temp_counter_3, ally_poke_party, &active_ally_poke_index, hostile_poke_party, &active_hostile_poke_index, &battle_item_index, battle_log_complete, &battle_log_stage_length, &battle_mode, &battle_screen_variant, &battle_outcome_stage, &battle_outcome_timer);
     }
     if(battle_mode==3) {    // Roam Screen
       display_roam_screen(&timer, terrain, terrain_width, terrain_height, tile_hwidth, player_coordinates);
@@ -1939,9 +2152,10 @@ int main()
     timer++;
 
 
-    // reset_beam();
-    // set_scale(128);
-    // set_text_size(-5, 40);
+    reset_beam();
+    set_scale(128);
+    set_text_size(-5, 40);
+
     // char debug[20];
     // sprintf(debug, "%u", rand());    // (0, 2^15-1]
     // print_str_c(0, 0, debug);
@@ -1952,40 +2166,48 @@ int main()
     // }
     // set_scale(128);
 
-    // reset_beam();
-    // set_scale(128);
-    // set_text_size(-5, 40);
-    // print_str_c(0, 0, (char*)(poke_move_lookup[1].name));
-    // set_scale(128);
+    // char int_char_timer[4];
+    // int_char_timer[0] = '0' +(battle_item_index);
+    // int_char_timer[1] = '0' +(hovered_pokeswitch);
+    // int_char_timer[2] = '2';
+    // int_char_timer[3] = '\0';
+    // print_str_c(20, 0, int_char_timer);
   }
   return 0;
 };
 
 /*
+######
+###### ]Currently all works EXCEPT new bag stuff which appears to break memory afterwards
+######    Make it perform subsets of this process to find where it breaks
+######
+
 ###
 ### Swapping works EXCEPT for the first turn
 ###     -> Is actually that you have to hit button 2 then 3???
 ### Text is also broken currently -> Probably related to seg fault when switching poke_info name from any length to fixed length
 ###
+
+###
+### ITEM -> MOVE LEADS TO NAMEING FAULTS --> LIKELY SOME USED VALUE HAS NOT RESET
+###       Other way around works fine => POKE BAG ACTS RESULT IN DISRUPTION
+###
+
 ###
 ### Need to get cycles to be around 30k for good framerate/minimal flickering
 ###   -> Currently between (100-180)k
 ###
 
-###
-### NOW make using items in the bag trigger their own unique actions -> Heal current poke (no selection), throw ball at new poke
-###
-
-
 ====
 TODO
 ====
-(3) Switching + catching pokemon
+(1) Switching + catching pokemon
 (2) Items / bag working
 
-(0) Poke visuals add
 (1) Learn moves with levels
-(4) Temp stat changing moves need to be added
+(2) Fainting mechanics / black out / related
+(3) Poke visuals add
 
-(1) Status effects on moves
+(1) Temp stat changing moves need to be added
+(2) Status effects on moves
 */
