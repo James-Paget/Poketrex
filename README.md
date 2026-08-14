@@ -3,7 +3,7 @@ A Pokemon-style demo for the Vectrex, programmed in C with the use of CMOC.
 
 # Build
 The .bin file can be generated, once CMOC is installed (tested on CMOC version 0.1.97) with the command;
-" cmoc --vectrex -I. -o POKETREX.bin poketrex_main.c "
+" cmoc --vectrex -I. -o POKETREX.bin *.c "
 Note as well that many of the headers seen in the 'vectrex_files' folder are provided directly from the 'cmoc/includes' directly provided on installation.
 
 # Running
