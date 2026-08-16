@@ -79,16 +79,20 @@ int main() {
     4 = Bag summary screen (OUT of combat)
     5 = Bag select screen (IN combat)
   */
+  // Global variables
   uint8_t screen_mode = 1;        // Which type of screen to display and calculate for
+
+  uint8_t timer = 0;  // Ticks throughout the entire program - Used for animations
 
   poke_details_flexible friendly_poke_party[POKE_PARTY_LENGTH];
   poke_details_flexible enemy_poke_party[POKE_PARTY_LENGTH];
 
-
   // Combat variables
-  uint8_t staging = 0;
+  uint8_t staging = 0;      // Tracks which part of the combat sequence you are currently in - Used for button pressing sequences as well as automatic fight displays
+  uint8_t stage_timer = 0;  // Tracks how far through current stage you are (used for text animations and progression to next timer at its max value)
+  uint8_t stage_speed = 1;  // Tracks how many timer ticks before stage_timer is increased e.g. ==N => stage_timer 1/N speed of base timer clock
 
-  uint8_t t1 = 1;   // Used for hovered indices, such as action hovered, move hovered, etc
+  uint8_t t1 = 0;   // Used for hovered indices, such as action hovered, move hovered, etc
 
   uint8_t friendly_active_poke_index = 0;
   uint8_t enemy_active_poke_index = 0;
@@ -108,18 +112,19 @@ int main() {
         //pass
         break;
       case 1:
-        process_combat_screen( &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &t1 );
+        process_combat_screen( &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &timer, &t1 );
         break;
       // ...
       default:
         //pass
         break;
     }
+    timer = timer +1; // Progress timer always (ONLY PERFORMED HERE) <- Can be adjusted to change game animation speeds (and hence combat stage durations too)
   }
   return 0;
 };
 
-void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *t1) {
+void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *timer, uint8_t *t1) {
   /*
   . staging = Which stage of combat you are in, e.g.;
     0 = Select action: moves, items, switch, run
@@ -138,6 +143,6 @@ void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
     20-...  = Item index from bag to be used (N-20th bag index)   <-- ### Overflow issue if too many items (very unlikely currently) ###
   */
   // Display and calculate for this screen
-  display_combat_screen(friendly_poke_party, enemy_poke_party, staging, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, t1);
-  calculate_combat_screen(friendly_poke_party, enemy_poke_party, staging, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, t1);
+  display_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
+  calculate_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
 }

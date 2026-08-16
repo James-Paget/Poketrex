@@ -29,13 +29,13 @@ BATTLE_ASSETS
     CAN draw every other frame for low detail aspects, etc
 */
 
-void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *t1) {
+void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *timer, uint8_t *t1) {
     reset_beam();
     // display_poke(20);
     bugfix_poke_details_flexible(&(friendly_poke_party[0]), 0, -45);
     bugfix_poke_details_flexible(&(enemy_poke_party[0]), 0, 45);
 
-    bugfix_combat_info(staging, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, t1, 60, 0);
+    bugfix_combat_info(staging, stage_timer, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1, 60, 0);
 }
 
 void display_poke(uint8_t radius) {
@@ -142,7 +142,7 @@ void bugfix_poke_details_flexible(poke_details_flexible *poke_details, int8_t yO
     print_str_c(-spacing*10 +yOrigin, spacing*3 +xOrigin, value_buffer);
 }
 
-void bugfix_combat_info(uint8_t *staging, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *t1_hover_var, int8_t yOrigin, int8_t xOrigin) {
+void bugfix_combat_info(uint8_t *staging, uint8_t *stage_timer, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *timer, uint8_t *t1_hover_var, int8_t yOrigin, int8_t xOrigin) {
     set_scale(128);
     set_text_size(-5, 40);
 
@@ -155,6 +155,13 @@ void bugfix_combat_info(uint8_t *staging, uint8_t *friendly_active_action, uint8
     value_buffer[2] = '0'+(*staging %10);
     value_buffer[3] = '\0';
     print_str_c(-spacing*0 +yOrigin, 0 +xOrigin, value_buffer);
+
+    // STAGING TIMER
+    value_buffer[0] = '0'+(*stage_timer /100);
+    value_buffer[1] = '0'+(*stage_timer /10)%10;
+    value_buffer[2] = '0'+(*stage_timer %10);
+    value_buffer[3] = '\0';
+    print_str_c(-spacing*0 +yOrigin, spacing*3 +xOrigin, value_buffer);
 
     // FRIENDLY ACTIVE ACTION
     value_buffer[0] = '0';
@@ -182,12 +189,19 @@ void bugfix_combat_info(uint8_t *staging, uint8_t *friendly_active_action, uint8
     value_buffer[3] = '\0';
     print_str_c(-spacing*2 +yOrigin, spacing*3 +xOrigin, value_buffer);
 
+    // TIMER
+    value_buffer[0] = '0'+(*timer /100);
+    value_buffer[1] = '0'+(*timer /10)%10;
+    value_buffer[2] = '0'+(*timer %10);
+    value_buffer[3] = '\0';
+    print_str_c(-spacing*3 +yOrigin, 0 +xOrigin, value_buffer);
+
     // T1 HOVER VAR
     value_buffer[0] = '0';
     value_buffer[1] = '0'+(*t1_hover_var /10);
     value_buffer[2] = '0'+(*t1_hover_var %10);
     value_buffer[3] = '\0';
-    print_str_c(-spacing*3 +yOrigin, 0 +xOrigin, value_buffer);
+    print_str_c(-spacing*4 +yOrigin, 0 +xOrigin, value_buffer);
 
     // ...
 }
