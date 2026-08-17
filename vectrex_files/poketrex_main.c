@@ -54,6 +54,24 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
     &(POKE_FIXED_CATALOGUE[1]),
   };
 
+  poke_details_flexible poke_flexible_starly = {
+    5,
+
+    30,
+    28,
+    1,
+    0,
+    2,
+    8,
+    1,
+
+    {1,2,0,0},
+
+    0,
+
+    &(POKE_FIXED_CATALOGUE[2]),
+  };
+
   friendly_poke_party[0] = poke_flexible_charmander;
   friendly_poke_party[1] = poke_flexible_null;
   friendly_poke_party[2] = poke_flexible_null;
@@ -61,7 +79,7 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
   friendly_poke_party[4] = poke_flexible_null;
   friendly_poke_party[5] = poke_flexible_null;
 
-  enemy_poke_party[0] = poke_flexible_null;
+  enemy_poke_party[0] = poke_flexible_starly;
   enemy_poke_party[1] = poke_flexible_null;
   enemy_poke_party[2] = poke_flexible_null;
   enemy_poke_party[3] = poke_flexible_null;
@@ -94,11 +112,19 @@ int main() {
 
   uint8_t t1 = 0;   // Used for hovered indices, such as action hovered, move hovered, etc
 
-  uint8_t friendly_active_poke_index = 0;
-  uint8_t enemy_active_poke_index = 0;
+  uint8_t friendly_active_poke_index = 0;   // Index of poke in either party which is currently in play
+  uint8_t enemy_active_poke_index = 0;      //
 
-  uint8_t friendly_active_action = 0;
-  uint8_t enemy_active_action = 0;
+  uint8_t friendly_active_action = 0;       // Int used to determine which action (move, item, etc) is being used; Action indices are defined in the calulate_combat.c file
+  uint8_t enemy_active_action = 0;          //
+
+  int8_t poke_first_counter = 0;            // Value of the counter currently applied to the poke -> This is specified in each stage where appropriate
+  int8_t poke_second_counter = 0;           //
+  uint8_t poke_first_counter_type = 0;      // Type of counter for the poke -> Specified in the stage where appropriate (e.g. 0=None, 1=HP, ..., N=SPD, ...)
+  uint8_t poke_second_counter_type = 0;     //
+
+  uint8_t is_critical = 0;  // Tracks whether an attack is critical - considers the poke being considered currently in staging only (0=NoCrit, 1=Crit)
+  uint8_t is_miss = 0;      // "" "" --> ### NOTE; THIS COULD BE REDUCED BY HAVING A SINGLE VARIABLE AND READING THE FIRST AND LAST 4 BITS INSTEAD -> TWICE THE DATA STORAGE ###
 
   // Initialisation
   initialise_poke_parties(friendly_poke_party, enemy_poke_party);
@@ -112,7 +138,7 @@ int main() {
         //pass
         break;
       case 1:
-        process_combat_screen( &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &timer, &t1 );
+        process_combat_screen( &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &poke_first_counter, &poke_second_counter, &poke_first_counter_type, &poke_second_counter_type, &is_critical, &is_miss, &timer, &t1 );
         break;
       // ...
       default:
@@ -124,7 +150,7 @@ int main() {
   return 0;
 };
 
-void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *timer, uint8_t *t1) {
+void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
   /*
   . staging = Which stage of combat you are in, e.g.;
     0 = Select action: moves, items, switch, run
@@ -144,5 +170,5 @@ void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
   */
   // Display and calculate for this screen
   display_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
-  calculate_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
+  calculate_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, poke_first_counter, poke_second_counter, poke_first_counter_type, poke_second_counter_type, is_critical, is_miss, timer, t1);
 }

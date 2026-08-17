@@ -51,3 +51,19 @@ typedef struct {
 } poke_details_flexible;
 
 #endif
+
+#ifndef POKE_MOVE_H
+#define POKE_MOVE_H
+
+typedef struct {
+    const char name[POKE_MOVE_NAME_LENGTH];
+    uint8_t type;
+
+    uint8_t ATK;
+    uint8_t SP_ATK;
+
+    uint16_t critical_chance;   // ### CHANGE TO UINT8_T AND JUST SHIFT RAND() BACK TO FIT IN THIS REGION ###
+    uint16_t miss_chance;       // ###
+} poke_move;
+
+#endif
