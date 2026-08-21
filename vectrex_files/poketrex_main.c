@@ -28,6 +28,8 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
     0,
     0,
     0,
+    0,
+    0,
 
     {1,2,0,0},
 
@@ -46,8 +48,10 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
     4,
     6,
     2,
+    0,
+    20,
 
-    {1,2,0,0},
+    {2,1,0,0},
 
     0,
 
@@ -58,12 +62,14 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
     5,
 
     30,
-    28,
+    11,
     1,
     0,
     2,
     8,
     1,
+    5,
+    24,
 
     {1,2,0,0},
 
@@ -135,10 +141,13 @@ int main() {
     // Display & Calculation
     switch(screen_mode) {
       case 0:
+        // ######
+        // ### FOR NOW, JUST IMPLMENT THIS IS A SCREEN WHERE A KEY PRESS GENERATED NEW ENCOUNTER AND TRIGGERS ALL COMBAT START CONDITIONS
+        // ######
         //pass
         break;
       case 1:
-        process_combat_screen( &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &poke_first_counter, &poke_second_counter, &poke_first_counter_type, &poke_second_counter_type, &is_critical, &is_miss, &timer, &t1 );
+        process_combat_screen( &screen_mode, &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &poke_first_counter, &poke_second_counter, &poke_first_counter_type, &poke_second_counter_type, &is_critical, &is_miss, &timer, &t1 );
         break;
       // ...
       default:
@@ -150,7 +159,7 @@ int main() {
   return 0;
 };
 
-void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
+void process_combat_screen(uint8_t *screen_mode, poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
   /*
   . staging = Which stage of combat you are in, e.g.;
     0 = Select action: moves, items, switch, run
@@ -170,5 +179,5 @@ void process_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
   */
   // Display and calculate for this screen
   display_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
-  calculate_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, poke_first_counter, poke_second_counter, poke_first_counter_type, poke_second_counter_type, is_critical, is_miss, timer, t1);
+  calculate_combat_screen(screen_mode, friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, poke_first_counter, poke_second_counter, poke_first_counter_type, poke_second_counter_type, is_critical, is_miss, timer, t1);
 }

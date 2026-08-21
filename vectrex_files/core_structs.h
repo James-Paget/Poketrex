@@ -28,7 +28,7 @@ typedef struct {
 /*
 . Stores variable details about a poke, such as;
     - Level
-    - Stats (HP_MAX, HP, DEF, SP.DEF, ATK, SP.ATK, SPD)
+    - Stats (HP_MAX, HP, DEF, SP.DEF, ATK, SP.ATK, SPD, EXP, EXP_MAX)
     - Current moves
     - The fixed poke details relating to this poke
 */
@@ -42,6 +42,8 @@ typedef struct {
     int8_t ATK;
     int8_t SP_ATK;
     int8_t SPD;
+    uint8_t EXP;        // >=0 only
+    uint8_t EXP_MAX;
 
     uint8_t moves[4];
 

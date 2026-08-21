@@ -10,7 +10,7 @@
 
 #include "calculate_combat.h"
 
-void calculate_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
+void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
     /*
     . poke_XXX_counter_type = Which type of value the poke_XXX_counter is tracking, e.g.;
         0 = None
@@ -68,11 +68,13 @@ void calculate_combat_screen(poke_details_flexible *friendly_poke_party, poke_de
         . (5) Status effect?
         -- Repeated for second poke (6-10)
 
-        . (11) Poke fainted
-        . (12) Experience gain
-        . (13) Switch
-        .   OR
-        . (14) End combat
+        . (11) Experience gain
+        . (12) Poke fainted
+        . (13) End combat
+
+        . (14) Switch <-- Jumped to when needed
+        ### MAYBE SPLIT INTO 2 -> 1 FOR MANUAL SWITCH OTHER FOR FORCED ###
+
 
         . (15) Item used
         . (16) Is healed?
@@ -89,57 +91,140 @@ void calculate_combat_screen(poke_details_flexible *friendly_poke_party, poke_de
 
         // Poke first
         case (4+1):
-            if(*poke_first_counter_type==0) {   // Should be found on first tick then ignored after that -> will also not be called on stages with no counter triggers so not an issue there
-                *poke_first_counter_type = 1;   // HP
-                // ###
-                // ### SHOULD ONLY USE THIS IF 'action' IN RANGE [1,4] HENCE IS A MOVE NOT AN ITEM OR SMTHING ELSE
-                // ###
-                *is_critical = GET_MOVE_CRITICAL( &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ] );
-                *is_miss = GET_MOVE_MISS( &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ] );
-                *poke_first_counter = GET_POKE_DAMAGE(poke_first, poke_second, &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ], is_critical, is_miss);   // *NOTE; This DOES account for effectiveness, crits and misses despite the staging for the text for these occurring after
-            }
+            if(poke_first->HP > 0) {
+                if(*poke_second_counter_type==0) {   // Should be found on first tick then ignored after that -> will also not be called on stages with no counter triggers so not an issue there
+                    *poke_second_counter_type = 1;   // HP
+                    // ###
+                    // ### SHOULD ONLY USE THIS IF 'action' IN RANGE [1,4] HENCE IS A MOVE NOT AN ITEM OR SMTHING ELSE
+                    // ###
+                    *is_critical = GET_MOVE_CRITICAL( &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ] );
+                    *is_miss = GET_MOVE_MISS( &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ] );
+                    *poke_second_counter = GET_POKE_DAMAGE(poke_first, poke_second, &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ], is_critical, is_miss);   // *NOTE; This DOES account for effectiveness, crits and misses despite the staging for the text for these occurring after
+                    if(*poke_second_counter > poke_second->HP) { *poke_second_counter = poke_second->HP; }
+                }
+            } else { *stage_timer = 250; }
             break;
         case (4+2):
+            if(poke_first->HP > 0) {
+                if(GET_EFFECTIVENESS(poke_second->fixed_details->types, &POKE_MOVE_CATALOGUE[ poke_first->moves[poke_first_active_action-1] ]) == 2) { *stage_timer = 250; }   // If normal effectiveness, skip the dialoague
+            } else { *stage_timer = 250; }
             break;
         case (4+3):
+            if(poke_first->HP > 0) {    
+                if(*is_critical == 0) { *stage_timer = 250; }   // If non-critical, skip dialogue
+            } else { *stage_timer = 250; }
             break;
         case (4+4):
+            if(poke_first->HP > 0) {
+                if(*is_miss == 0) { *stage_timer = 250; }   // If NOT missing, don't show dialogue for missing
+            } else { *stage_timer = 250; }
             break;
         case (4+5):
+            if(poke_first->HP > 0) {    
+                if(1==1) { *stage_timer = 250; }   // ### SKIP ALWAYS FOR NOW --> Should check if a status triggers in future ###
+            } else { *stage_timer = 250; }
             break;
 
         // Poke second
         case (4+6):
-            if(*poke_second_counter_type==0) {
-                *poke_second_counter_type = 1;    // HP
-                // ###
-                // ### SHOULD ONLY USE THIS IF 'action' IN RANGE [1,4] HENCE IS A MOVE NOT AN ITEM OR SMTHING ELSE
-                // ###
-                *is_critical = GET_MOVE_CRITICAL( &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ] );
-                *is_miss = GET_MOVE_MISS( &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ] );
-                *poke_second_counter = GET_POKE_DAMAGE(poke_second, poke_first, &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ], is_critical, is_miss);   // *NOTE; This DOES account for effectiveness, crits and misses despite the staging for the text for these occurring after
-            }
+            if(poke_second->HP > 0) {
+                if(*poke_first_counter_type==0) {
+                    *poke_first_counter_type = 1;    // HP
+                    // ###
+                    // ### SHOULD ONLY USE THIS IF 'action' IN RANGE [1,4] HENCE IS A MOVE NOT AN ITEM OR SMTHING ELSE
+                    // ###
+                    *is_critical = GET_MOVE_CRITICAL( &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ] );
+                    *is_miss = GET_MOVE_MISS( &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ] );
+                    *poke_first_counter = GET_POKE_DAMAGE(poke_second, poke_first, &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ], is_critical, is_miss);   // *NOTE; This DOES account for effectiveness, crits and misses despite the staging for the text for these occurring after
+                    if(*poke_first_counter > poke_first->HP) { *poke_first_counter = poke_first->HP; }
+                }
+            } else { *stage_timer = 250; }
             break;
         case (4+7):
+            if(poke_second->HP > 0) {
+                if(GET_EFFECTIVENESS(poke_first->fixed_details->types, &POKE_MOVE_CATALOGUE[ poke_second->moves[poke_second_active_action-1] ]) == 2) { *stage_timer = 250; }   // If normal effectiveness, skip the dialoague
+            } else { *stage_timer = 250; }
             break;
         case (4+8):
+            if(poke_second->HP > 0) {
+                if(*is_critical == 0) { *stage_timer = 250; }   // If non-critical, skip dialogue
+            } else { *stage_timer = 250; }
             break;
         case (4+9):
+            if(poke_second->HP > 0) {
+                if(*is_miss == 0) { *stage_timer = 250; }   // If NOT missing, don't show dialogue for missing
+            } else { *stage_timer = 250; }
             break;
         case (4+10):
+            if(poke_second->HP > 0) {
+                if(1==1) { *stage_timer = 250; }   // ### SKIP ALWAYS FOR NOW --> Should check if a status triggers in future ###
+            } else { *stage_timer = 250; }
             break;
 
         // Others
-        case (4+11):
-            if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
+        case (4+11):    // EXPERIENCE
+            // Experience to second
+            if(poke_first->HP <= 0) {
+                if(*poke_second_counter_type==0) {
+                    *poke_second_counter_type = 7;    // EXP
+                    *poke_second_counter = GET_EXPERIENCE(poke_first);
+                    if(*poke_second_counter > poke_second->EXP_MAX-poke_second->EXP) { *poke_second_counter = poke_second->EXP_MAX-poke_second->EXP; }
+                }
+            }
+
+            // Experience to first
+            if(poke_second->HP <= 0) {
+                if(*poke_first_counter_type==0) {
+                    *poke_first_counter_type = 7;    // EXP
+                    *poke_first_counter = GET_EXPERIENCE(poke_second);
+                    if(*poke_first_counter > poke_first->EXP_MAX-poke_first->EXP) { *poke_first_counter = poke_first->HP; }
+                }
+            }
+
+            if( (poke_first->HP > 0) && (poke_second->HP > 0) ) { *stage_timer=250; }   // If both pokes are healthy, no need to show exp gain
+            // if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
             break;
-        case (4+12):
-            if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
+
+        case (4+12):    // FAINT -> Pick new pokes
+            if(*stage_timer >= 250) {   // One time trigger at frame 250
+
+                if(friendly_poke_party[*friendly_active_poke_index].HP <= 0) {  // If friendly poke fainted, GO TO poke switch screen to choose a new poke
+                    if(sum_fainted_poke(friendly_poke_party) < 6) {      // Only do this IF another poke is viable to be chosen (if NONE viable, then will end combat in a couple stages anyway so leaving the fainted poke out in the open is fine)
+                        // ###
+                        // ### JUMP TO FAINT SELECTION SCREEN
+                        // ###
+                    }
+                }
+                
+                if(friendly_poke_party[*friendly_active_poke_index].HP <= 0) {  // If enemy poke fainted, randomly choose another to come out
+                    if(sum_fainted_poke(friendly_poke_party) < 6) {      // Only do this IF another poke is viable to be chosen (if NONE viable, then will end combat in a couple stages anyway so leaving the fainted poke out in the open is fine)
+                        // ### RANDOMLY PICK ANOTHER VIABLE ACTIVE INDEX ###
+                    }
+                }
+                // *Note; Animation for switching poke can from frame X-250, where X is in (125, 250) --> This switch can then happen just before or right at the end of this animation
+                
+            }
+            if( (poke_first->HP > 0) && (poke_second->HP > 0) ) { *stage_timer=250; }   // If both pokes are healthy, no need to show faint dialogue
             break;
-        case (4+13):
-            if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
+        case (4+13):    // END COMBAT
+            if(*stage_timer >= 200) {   // Stage_timer >=250 hence still triggers parameter reset still
+
+                if(sum_fainted_poke(friendly_poke_party) >= POKE_PARTY_LENGTH) {    // If all friendly pokes have fainted, then you are forced to leave combat
+                    // ###
+                    // ### TAKE YOU TO A SCREEN SAYING YOU WHITED OUT FIRST
+                    // ###
+                    *screen_mode = 0;   // Switch to roaming screen
+                }
+                if(sum_fainted_poke(enemy_poke_party) >= POKE_PARTY_LENGTH) {    // If all enemy pokes have fainted, then you are forced to leave combat
+                    *screen_mode = 0;   // Switch to roaming screen
+                }
+
+                // *staging=30;    // To go to end of staging to trigger next round of combat
+
+            }
+
             break;
-        case (4+14):
+        case (4+14):    // SWITCH
             if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
             break;
 
@@ -175,6 +260,8 @@ void calculate_combat_screen(poke_details_flexible *friendly_poke_party, poke_de
             case 5:     // SP_ATK
                 break;
             case 6:     // SPD
+                break;
+            case 7:     // EXP
                 break;
             // ...
         }
@@ -225,6 +312,19 @@ void calculate_combat_screen(poke_details_flexible *friendly_poke_party, poke_de
             *staging = 0;
         }
     }
+
+    // ### BUG-FIXING ###
+    // uint8_t dead_count_e = sum_fainted_poke(enemy_poke_party);
+    // reset_beam();
+    // set_scale(128);
+    // set_text_size(-5, 40);
+    // char value_buffer[4];
+    // // STAGING
+    // value_buffer[0] = '0';
+    // value_buffer[1] = '0'+(dead_count_e /10);
+    // value_buffer[2] = '0'+(dead_count_e %10);
+    // value_buffer[3] = '\0';
+    // print_str_c(-50, -75, value_buffer);
 }
 
 void calculate_combat_buttons_actionSelection(uint8_t *friendly_hovered_action, uint8_t *staging) {
@@ -320,6 +420,8 @@ void calculate_combat_buttons(poke_details_flexible *friendly_poke_party, poke_d
             3,
             1,
             5,
+            2,
+            15,
 
             {3,5,0,4},
 
@@ -345,6 +447,8 @@ void calculate_combat_buttons(poke_details_flexible *friendly_poke_party, poke_d
             3,
             1,
             5,
+            0,
+            15,
 
             {3,5,0,4},
 
@@ -366,6 +470,18 @@ void calculate_combat_buttons(poke_details_flexible *friendly_poke_party, poke_d
         print_str_c(0, 0, (char*)"PRESSED 3");
         set_scale(128);
     }
+}
+
+uint8_t sum_fainted_poke(poke_details_flexible *poke_party) {
+    /*
+    . Specify a pointer to a list of pokes of length POKE_PARTY_LENGTH
+    . Returns the number of pokes in the party specified which have fainted (HP<=0) <-- =0 in reality since stored as uint8_t hence cannot be <0
+    */
+    uint8_t fainted_number = 0;
+    for(uint8_t i=0; i<POKE_PARTY_LENGTH; i++) { 
+        if(poke_party[i].HP <= 0) {fainted_number+=1;}
+    }
+    return fainted_number;
 }
 
 uint8_t GET_POKE_DAMAGE(poke_details_flexible *p1, poke_details_flexible *p2, const poke_move *m, uint8_t *is_critical, uint8_t *is_miss) {
@@ -405,7 +521,7 @@ uint8_t GET_MOVE_MISS(const poke_move *m) {
         return 0;
     }
 }
-uint8_t GET_EFFECTIVENESS(uint8_t *types, const poke_move *m) {
+uint8_t GET_EFFECTIVENESS(const uint8_t *types, const poke_move *m) {
     /*
     . Returns the effectiveness of a move m against a poke's types
     . Effectiveness value returned is a multiplier/2 for damage dealt e.g. SuperEff=>4/2=2 *multi, NotVeryEff=>1/2=0.5 *multi 
@@ -420,4 +536,13 @@ uint8_t GET_EFFECTIVENESS(uint8_t *types, const poke_move *m) {
     */
     // ### NEEDS TO TAKE INTO ACCOUNT 2nd TYPE AS WELL --> SEE WHAT ACTUAL IMPLEMENTATION IS ###
     return 2;   //type_effectiveness_lookup[18*(uint16_t)(m->type) +types[0]];  <----- ### CURRENTLY NOT USING BOTH TYPES --> EASY FIX ###
+}
+uint8_t GET_EXPERIENCE(poke_details_flexible *fainted_poke) {
+    /*
+    . Returns the experience given by the fainted_poke provided
+    */
+    // ###
+    // ### PLACEHOLDER FOR ACTUAL/NEAR ENOUGH EQUATION
+    // ###
+    return fainted_poke->level;
 }
