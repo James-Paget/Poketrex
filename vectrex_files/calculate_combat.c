@@ -162,13 +162,12 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
             break;
 
         // Others
-        case (4+11):    // EXPERIENCE
+        case (15):    // EXPERIENCE
             // Experience to second
             if(poke_first->HP <= 0) {
                 if(*poke_second_counter_type==0) {
                     *poke_second_counter_type = 7;    // EXP
                     *poke_second_counter = GET_EXPERIENCE(poke_first);
-                    if(*poke_second_counter > poke_second->EXP_MAX-poke_second->EXP) { *poke_second_counter = poke_second->EXP_MAX-poke_second->EXP; }
                 }
             }
 
@@ -185,20 +184,23 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
             // if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
             break;
 
-        case (4+12):    // FAINT -> Pick new pokes
+        case (16):    // FAINT -> Pick new pokes
             if(*stage_timer >= 250) {   // One time trigger at frame 250
 
                 if(friendly_poke_party[*friendly_active_poke_index].HP <= 0) {  // If friendly poke fainted, GO TO poke switch screen to choose a new poke
                     if(sum_fainted_poke(friendly_poke_party) < 6) {      // Only do this IF another poke is viable to be chosen (if NONE viable, then will end combat in a couple stages anyway so leaving the fainted poke out in the open is fine)
-                        // ###
-                        // ### JUMP TO FAINT SELECTION SCREEN
-                        // ###
+                        *staging = 18;  // SWITCH
                     }
                 }
                 
                 if(friendly_poke_party[*friendly_active_poke_index].HP <= 0) {  // If enemy poke fainted, randomly choose another to come out
                     if(sum_fainted_poke(friendly_poke_party) < 6) {      // Only do this IF another poke is viable to be chosen (if NONE viable, then will end combat in a couple stages anyway so leaving the fainted poke out in the open is fine)
-                        // ### RANDOMLY PICK ANOTHER VIABLE ACTIVE INDEX ###
+                        for(uint8_t i=0; i<POKE_PARTY_LENGTH; i++) {    // For now, simply pick the earliest poke in the list that is not fainted to switch to
+                            if(enemy_poke_party[i].HP > 0) {
+                                *enemy_active_poke_index = i;
+                                break;
+                            }
+                        }
                     }
                 }
                 // *Note; Animation for switching poke can from frame X-250, where X is in (125, 250) --> This switch can then happen just before or right at the end of this animation
@@ -206,7 +208,7 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
             }
             if( (poke_first->HP > 0) && (poke_second->HP > 0) ) { *stage_timer=250; }   // If both pokes are healthy, no need to show faint dialogue
             break;
-        case (4+13):    // END COMBAT
+        case (17):    // END COMBAT
             if(*stage_timer >= 200) {   // Stage_timer >=250 hence still triggers parameter reset still
 
                 if(sum_fainted_poke(friendly_poke_party) >= POKE_PARTY_LENGTH) {    // If all friendly pokes have fainted, then you are forced to leave combat
@@ -222,14 +224,27 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
                 // *staging=30;    // To go to end of staging to trigger next round of combat
 
             }
+            if(*stage_timer >= 220) {
+                *staging = 30;          // Force reset to next round of combat
+                *stage_timer = 250;     //  + reset parameters properly
+            }
 
             break;
-        case (4+14):    // SWITCH
+        case (18):    // SWITCH
             if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
+            // ######
+            // ### NEED TO TEST THIS WITH BUG-FIX VISUALISER
+            // ######
+            calculate_combat_buttons_pokeSwitch(friendly_poke_party, friendly_active_poke_index, staging, t1);
+            break;
+        case (19):    // POKE BAG
+            if(*stage_timer >= 250) {/*JUMP TO COMBAT AGAIN IF NEEDED*/}
+            calculate_combat_buttons_pokeBag();
             break;
 
         // ...
         default:
+            *staging = *staging +1; // If unsure, just progress staging to try reset combat
             break;
     }
 
@@ -262,6 +277,19 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
             case 6:     // SPD
                 break;
             case 7:     // EXP
+                if(poke_first->EXP >= poke_first->EXP_MAX) {    // When you reach the LVL UP threshold, reset EXP, increased EXP_MAX and increased LVL
+                    poke_first->EXP = 0;
+                    poke_first->EXP_MAX = (uint8_t)((5*(uint16_t)(poke_first->EXP_MAX))/4);  //EXP_MAX*(5/4) => 25% increased each time
+                    poke_first->level = poke_first->level +1;
+                }
+                if(*poke_first_counter > 0) {   // If EXP to give, give it 1 at a time and reduce
+                    // ###
+                    // ### FOR LARGE EXP VALUES, WILL NEED TO GIVE N AT A TIME
+                    // ###      THIS IS FINE FOR TESTING PURPOSES NOW, BUT FIX LIKE WITH HP SOON
+                    // ###
+                    poke_first->EXP = poke_first->EXP +1;
+                    *poke_first_counter = *poke_first_counter -1;
+                }
                 break;
             // ...
         }
@@ -291,12 +319,15 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
                 break;
             case 6:     // SPD
                 break;
+            case 7:     // EXP
+                break;
             // ...
         }
     }
 
     // Update the stage counter IF NOT in any of the button menus (only automatically progress in automatic section)
-    if(*staging >= 4) { if((*timer % *stage_speed)==0) {*stage_timer = *stage_timer +4;}; }  // Update stage timer slower than base timer
+    // ALSO don't progress time if on SWITCH or BAG stages (18 and ...)
+    if( (*staging >= 4) && (*staging != 18) ) { if((*timer % *stage_speed)==0) {*stage_timer = *stage_timer +4;}; }  // Update stage timer slower than base timer
     if(*stage_timer >= 250) {
         *stage_timer = 0;  // Manually reset stage_timer (REQUIRED)
         *staging = *staging +1;
@@ -308,7 +339,7 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
         // *Note; Staging jumps (e.g. from poke ball stage back to combat) occurs within the specific stage above; this is for typical stage progression
         
         // Reset combat staging once all resolved
-        if(*staging >= 19) {
+        if(*staging >= 30) {
             *staging = 0;
         }
     }
@@ -383,10 +414,12 @@ void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke
     }
 
     if(buttons & JOY1_BTN2_MASK) {              // Select option
-        if( (0 <= *friendly_active_poke_index) && (*friendly_active_poke_index < POKE_PARTY_LENGTH) ) {
-            *friendly_active_action = *friendly_hovered_move +1;    // Select move
-            *friendly_hovered_move = 0;                             // Reset the temporary hover variable
-            *staging = 4;                                           // Move staging
+        if( (0 <= *friendly_active_poke_index) && (*friendly_active_poke_index < POKE_PARTY_LENGTH) ) {     // If is a valid poke
+            if(POKE_MOVE_CATALOGUE[ friendly_poke_party[*friendly_active_poke_index].moves[*friendly_hovered_move] ].type != 0) {    // If is a non-null move
+                *friendly_active_action = *friendly_hovered_move +1;    // Select move
+                *friendly_hovered_move = 0;                             // Reset the temporary hover variable
+                *staging = 4;                                           // Move staging
+            }
         }
 
         reset_beam();
@@ -397,6 +430,81 @@ void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke
     if(buttons & JOY1_BTN3_MASK) {              // Back out of options
         *staging = 0;
         *friendly_hovered_move = 0;     // Reset the temporary hover variable
+
+        reset_beam();
+        print_str_c(0, 0, (char*)"PRESSED 3");
+        set_scale(128);
+    }
+}
+void calculate_combat_buttons_pokeSwitch(poke_details_flexible *friendly_poke_party, uint8_t *friendly_active_poke_index, uint8_t *staging, uint8_t *hovered_poke_index) {
+    /*
+    . Buttons to control which poke to switch to
+    . Occurs for a manual switch and for a forced switch (when your friendly poke faints)
+    . NO option to BACK OUT when in this menu -> simplifies it working for both forced and manual switching
+    */
+    uint8_t buttons = read_buttons();
+    if(buttons & JOY1_BTN1_MASK) {              // Cycle options
+        *hovered_poke_index = (*hovered_poke_index +1)%(POKE_PARTY_LENGTH);
+
+        // ###
+        // ### NOTE THIS IS TERRIBLE FOR PERFORMANCE
+        // ###      BUT IS GOOD FOR BUG-FIXING AND NOT A BIG ISSUE FOR 1 TIME USES
+        // ###
+        reset_beam();
+        print_str_c(0, 0, (char*)"PRESSED 1");
+        set_scale(128);
+    }
+
+    if(buttons & JOY1_BTN2_MASK) {              // Select poke to switch to
+        if( (0 <= *hovered_poke_index) && (*hovered_poke_index < POKE_PARTY_LENGTH) ) {     // If within bounds
+            if(friendly_poke_party[*hovered_poke_index].HP > 0) {                           // If alive
+                *friendly_active_poke_index = *hovered_poke_index;    // Select poke
+                *hovered_poke_index = 0;                             // Reset the temporary hover variable
+                *staging = 17;                                       // Move staging
+            }
+        }
+
+        reset_beam();
+        print_str_c(0, 0, (char*)"PRESSED 2");
+        set_scale(128);
+    }
+
+    // if(buttons & JOY1_BTN3_MASK) {              // Back out of options
+    //     //pass
+
+    //     reset_beam();
+    //     print_str_c(0, 0, (char*)"PRESSED 3");
+    //     set_scale(128);
+    // }
+}
+void calculate_combat_buttons_pokeBag() {
+    /*
+    . Buttons to control which item to choose in the player's bag
+    . *Note; This is purely for using an item mid combat, not while roaming, etc
+    */
+    uint8_t buttons = read_buttons();
+    if(buttons & JOY1_BTN1_MASK) {              // Cycle options
+        // pass
+
+        // ###
+        // ### NOTE THIS IS TERRIBLE FOR PERFORMANCE
+        // ###      BUT IS GOOD FOR BUG-FIXING AND NOT A BIG ISSUE FOR 1 TIME USES
+        // ###
+        reset_beam();
+        print_str_c(0, 0, (char*)"PRESSED 1");
+        set_scale(128);
+    }
+
+    if(buttons & JOY1_BTN2_MASK) {              // Select option
+        // pass
+
+        reset_beam();
+        print_str_c(0, 0, (char*)"PRESSED 2");
+        set_scale(128);
+    }
+
+    if(buttons & JOY1_BTN3_MASK) {              // Back out of options
+        //pass
 
         reset_beam();
         print_str_c(0, 0, (char*)"PRESSED 3");

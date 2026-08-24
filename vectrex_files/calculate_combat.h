@@ -8,6 +8,8 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
 
 void calculate_combat_buttons_actionSelection(uint8_t *friendly_hovered_action, uint8_t *staging);
 void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke_party, uint8_t *friendly_active_action, uint8_t *friendly_active_poke_index, uint8_t *friendly_hovered_move, uint8_t *staging);
+void calculate_combat_buttons_pokeSwitch(poke_details_flexible *friendly_poke_party, uint8_t *friendly_active_poke_index, uint8_t *staging, uint8_t *hovered_poke_index);
+void calculate_combat_buttons_pokeBag();
 
 void calculate_combat_buttons(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party);
 

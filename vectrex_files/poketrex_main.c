@@ -39,16 +39,16 @@ void initialise_poke_parties(poke_details_flexible friendly_poke_party[POKE_PART
   };
 
   poke_details_flexible poke_flexible_charmander = {
-    5,
+    13,
 
-    20,
-    15,
+    32,
+    30,
     2,
     -1,
     4,
     6,
     2,
-    0,
+    5,
     20,
 
     {2,1,0,0},
