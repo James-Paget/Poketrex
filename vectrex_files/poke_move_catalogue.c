@@ -26,8 +26,8 @@ const poke_move POKE_MOVE_CATALOGUE[POKE_MOVE_CATALOGUE_NUMBER] = {
     {   // Ember
         {'E','M','B','E','R','','\0'},
         2,
-        20,
-        20,
+        5,
+        7,
         100,
         100,
     },

@@ -4,7 +4,9 @@
 
 #include "game_constants.h"
 #include "core_structs.h"
+
 #include "poke_move_catalogue.h"
+#include "core_poke_functions.h"
 
 #include "display_combat.h"
 
@@ -51,6 +53,7 @@ void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
     const uint8_t poke_width = 80;  //40
     const uint8_t poke_vertical_offset = 40;    // Centre to first poke, AND spacing between friendly and enemy poke
     int8_t text_box_height = 60;    // Height of the text box at the bottom of the screen / action box
+
     reset_beam();
 
     switch(*staging) {
@@ -67,18 +70,25 @@ void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
             intensity(0x4f);
             move(poke_vertical_offset, 0);        // Position the info slightly higher up the screen to give room for text below
             move(0, -120);
+            // move(linear_to_oscil(*timer)>>4, 0);
             display_poke_bars(0,0, &(friendly_poke_party[*friendly_active_poke_index]), poke_width );
+            move(linear_to_oscil(*timer)>>4, 0);
             display_poke_portrait(poke_width);
-            move(poke_vertical_offset, 120);               // Back to origin + vertical offset
-            move(0, 120-poke_width);    // Enough ahead so edge of poke_width is at far right (120~128)
+
+            // move(-linear_to_oscil(*timer)>>4, 0);
+            // move(poke_vertical_offset, 120);        // Back to origin + vertical offset
+            // move(0, 120-poke_width);    // Enough ahead so edge of poke_width is at far right (120~128)
+            reset_beam();   // Need to go back to origin to re-align anyway, so might as well reset_beam()
+            move(2*poke_vertical_offset, 120-poke_width);
             display_poke_bars(0,0, &(enemy_poke_party[*enemy_active_poke_index]), poke_width );
+            move(linear_to_oscil(64+*timer)>>4, 0);
             display_poke_portrait(poke_width);
 
             reset_beam();
             display_battle_box(&text_box_height, staging, timer, t1);
 
             reset_beam();
-            display_battle_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, &poke_vertical_offset, &text_box_height, &poke_width, staging, stage_timer, encounter_text);
+            display_battle_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, friendly_active_action, enemy_active_action, &poke_vertical_offset, &text_box_height, &poke_width, staging, stage_timer, encounter_text);
     }
 
     // ###
@@ -184,13 +194,13 @@ void display_battle_box(int8_t *box_height, uint8_t *staging, uint8_t *timer, ui
         );
     }
 }
-void display_battle_text(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, const uint8_t *poke_vertical_offset, int8_t *box_height, const uint8_t *width, uint8_t *staging, uint8_t *stage_timer, char *encounter_text) {
+void display_battle_text(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *friendly_active_action, uint8_t *enemy_active_action, const uint8_t *poke_vertical_offset, int8_t *box_height, const uint8_t *width, uint8_t *staging, uint8_t *stage_timer, char *encounter_text) {
     /*
     . Displays the text for the battle boxes, showing action/move names
     . Handled separately since each requires the text to move to the origin each time so time will be wasted no matter what
     */
     display_poke_stats_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, poke_vertical_offset, width, staging);
-    display_encounter_text(box_height, staging, stage_timer, encounter_text);
+    display_encounter_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, friendly_active_action, enemy_active_action, box_height, staging, stage_timer, encounter_text);
     display_action_text(friendly_poke_party, friendly_active_poke_index, box_height, staging);
 }
 
@@ -208,10 +218,10 @@ void display_poke_stats_text(poke_details_flexible *friendly_poke_party, poke_de
     print_str_c((*poke_vertical_offset) +(*width>>3) +(*width>>4), -120 +(*width>>4)             , (char*)(friendly_poke_party[*friendly_active_poke_index].fixed_details->name) );
     print_str_c((*poke_vertical_offset) +(*width>>3) +(*width>>4), -120 +(*width>>4) +(*width>>1), friendly_poke_level );
 
-    print_str_c( 2*(*poke_vertical_offset) +(*width>>3) -(*width>>5), 120 -*width +(*width>>3) +(*width>>4), (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name) );
-    print_str_c( 2*(*poke_vertical_offset) +(*width>>3) -(*width>>5), 120 -*width +(*width>>3) +(*width>>1) +(*width>>4), enemy_poke_level );
+    print_str_c( 2*(*poke_vertical_offset) +(*width>>3) +(*width>>4), 120 -*width +(*width>>4), (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name) );
+    print_str_c( 2*(*poke_vertical_offset) +(*width>>3) +(*width>>4), 120 -*width +(*width>>1) +(*width>>4), enemy_poke_level );
 }
-void display_encounter_text(int8_t *box_height, uint8_t *staging, uint8_t *stage_timer, char *encounter_text) {
+void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *friendly_active_action, uint8_t *enemy_active_action, int8_t *box_height, uint8_t *staging, uint8_t *stage_timer, char *encounter_text) {
     /*
     . Displays the text for the combat description, E.g; XXX WAS SUPER EFFECTIVE!
     . Shown in the bottom left corner
@@ -220,74 +230,254 @@ void display_encounter_text(int8_t *box_height, uint8_t *staging, uint8_t *stage
     ######
     ######
     ### (1) Complete text here
-    ### (2) Basic poke sprites
-    ### (3) Reset encounters + ensure EXP working correctly
+    ### (2) Reset encounters + ensure EXP working correctly
+    ### (3) Basic poke sprites
     ### (4) Basic switch interface?
     ######
     ######
     */
-    switch(*staging) {
-        case 4+0:
-            //pass
-            break;
+    if(*stage_timer > 5) {
+        switch(*staging) {
+            case 4+0:
+                set_text(
+                    encounter_text,
+                    14,
+                    (char*)"COMBAT BEGINS!"
+                );
+                break;
 
-        // First poke
-        case 4+1:
-            //pass
-            break;
-        case 4+2:
-            //pass
-            break;
-        case 4+3:
-            //pass
-            break;
-        case 4+4:
-            //pass
-            break;
-        case 4+5:
-            //pass
-            break;
-        
-        // Second poke
-        case 4+6:
-            //pass
-            break;
-        case 4+7:
-            //pass
-            break;
-        case 4+8:
-            //pass
-            break;
-        case 4+9:
-            //pass
-            break;
-        case 4+10:
-            //pass
-            break;
+            // ###
+            // ### THIS IS RECALCED EACH TURN, COULD MINIMISE THIS AND JUST DO ON FIRST FRAME THEN LEAVE ENCOUTNER_TEXT UNCHANGED
+            // ###      ALTHOUGH THIS NEEDS TO BE RE-FOUND SINCE ENCOUNTER TEXT DEFINED INSIDE THIS FUNCTION
+            // ###
+            // First poke
+            case 4+1:
+                // ###
+                // ### NEEDS TO BE FIRST, NOT FRIENDLY 
+                // ###
+                set_text(
+                    encounter_text,
+                    POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
+                    (char*)"XXXXXXX USED XXXXXXXY"
+                );
+                set_text_subset(
+                    encounter_text,
+                    0,
+                    POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                    (char*)(friendly_poke_party[*friendly_active_poke_index].fixed_details->name)
+                );
+                set_text_subset(
+                    encounter_text,
+                    POKE_NAME_LENGTH+6,
+                    POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
+                    (char*)(POKE_MOVE_CATALOGUE[friendly_poke_party[*friendly_active_poke_index].moves[*friendly_active_action-1]].name)
+                );
+                break;
+            case 4+2:
+                switch(GET_EFFECTIVENESS(enemy_poke_party[*enemy_active_poke_index].fixed_details->types, &POKE_MOVE_CATALOGUE[friendly_poke_party[*friendly_active_poke_index].moves[*friendly_active_action-1]])) {
+                    case 0:     // No effect
+                        set_text(
+                            encounter_text,
+                            20,
+                            (char*)"IT HAD NO EFFECT..."
+                        );
+                        break;
+                    case 1:     // Not very effective
+                        set_text(
+                            encounter_text,
+                            24,
+                            (char*)"IT WAS NOT EFFECTIVE..."
+                        );
+                        break;
+                    case 2:     // Normal effectiveness
+                        set_text(
+                            encounter_text,
+                            5,
+                            (char*)"NULL"       //*NOTE; Null text since this should NOT be shown in normal effective case
+                        );
+                        break;
+                    case 4:     // Super effective
+                        set_text(
+                            encounter_text,
+                            24,
+                            (char*)"IT WAS SUPER EFFECTIVE!"
+                        );
+                        break;
+                    default:     // Fall back text
+                        set_text(
+                            encounter_text,
+                            5,
+                            (char*)"NULL"
+                        );
+                        break;
+                }
+                break;
+            // ###
+            // ### MAY HAVE TO NOT DISPLAY UNTIL A COUPLE FRAMES AFTER TO DODGE A SLIGHT DISPLAY OF THE MSG
+            // ###
+            case 4+3:
+                // *NOTE; Will be skipped if non-critical
+                set_text(
+                    encounter_text,
+                    23,
+                    (char*)"IT WAS A CRITICAL HIT!"
+                );
+                break;
+            case 4+4:
+                // *NOTE; Will be skipped if non-miss
+                set_text(
+                    encounter_text,
+                    11,
+                    (char*)"IT MISSED!"
+                );
+                break;
+            case 4+5:
+                // ######
+                // ### STATUS EFFECT MSG -> Add later on
+                // ######
+                break;
+            
+            // Second poke
+            case 4+6:
+                // ###
+                // ### NEEDS TO BE SECOND, NOT ENEMY 
+                // ###
+                set_text(
+                    encounter_text,
+                    POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
+                    (char*)"XXXXXXX USED XXXXXXXY"
+                );
+                set_text_subset(
+                    encounter_text,
+                    0,
+                    POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                    (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name)
+                );
+                set_text_subset(
+                    encounter_text,
+                    POKE_NAME_LENGTH+6,
+                    POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
+                    // (char*)(POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[*enemy_active_action-1]].name)
+                    (char*)(POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[0]].name)
+                );
+                break;
+            case 4+7:
+                switch(GET_EFFECTIVENESS(friendly_poke_party[*friendly_active_poke_index].fixed_details->types, &POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[*enemy_active_action-1]])) {
+                    case 0:     // No effect
+                        set_text(
+                            encounter_text,
+                            20,
+                            (char*)"IT HAD NO EFFECT..."
+                        );
+                        break;
+                    case 1:     // Not very effective
+                        set_text(
+                            encounter_text,
+                            24,
+                            (char*)"IT WAS NOT EFFECTIVE..."
+                        );
+                        break;
+                    case 2:     // Normal effectiveness
+                        set_text(
+                            encounter_text,
+                            5,
+                            (char*)"NULL"       //*NOTE; Null text since this should NOT be shown in normal effective case
+                        );
+                        break;
+                    case 4:     // Super effective
+                        set_text(
+                            encounter_text,
+                            24,
+                            (char*)"IT WAS SUPER EFFECTIVE!"
+                        );
+                        break;
+                    default:     // Fall back text
+                        set_text(
+                            encounter_text,
+                            5,
+                            (char*)"NULL"
+                        );
+                        break;
+                }
+                break;
+            case 4+8:
+                set_text(
+                    encounter_text,
+                    23,
+                    (char*)"IT WAS A CRITICAL HIT!"
+                );
+                break;
+            case 4+9:
+                set_text(
+                    encounter_text,
+                    11,
+                    (char*)"IT MISSED!"
+                );
+                break;
+            case 4+10:
+                // ######
+                // ### STATUS EFFECT MSG -> Add later on
+                // ######
+                break;
 
-        case 15:   // EXPERIENCE
-            //pass
-            break;
-        case 16:   // FAINT
-            //pass
-            break;
-        case 17:   // END
-            //pass
-            break;
-        case 18:   // SWITCH
-            //pass
-            break;
-        case 19:   // BAG
-            //pass
-            break;
-        
-        default:
-            set_text(
-                encounter_text, 
-                ENCOUNTER_TEXT_LENGTH, 
-                (char*)"WHAT WILL YOU DECIDE?"
-            );
-            break;
+            case 15:   // EXPERIENCE
+
+                if(friendly_poke_party[*friendly_active_poke_index].HP <= 0) {
+                    set_text(
+                        encounter_text,
+                        16,
+                        (char*)"XXXXXXX FAINTED"
+                    );
+                    set_text_subset(
+                        encounter_text,
+                        0,
+                        POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                        (char*)(friendly_poke_party[*friendly_active_poke_index].fixed_details->name)
+                    );
+                }
+                if(enemy_poke_party[*enemy_active_poke_index].HP <= 0) {
+                    set_text(
+                        encounter_text,
+                        16,
+                        (char*)"XXXXXXX FAINTED"
+                    );
+                    set_text_subset(
+                        encounter_text,
+                        0,
+                        POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                        (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name)
+                    );
+                }
+
+                break;
+            case 16:   // FAINT
+                //pass
+                break;
+            case 17:   // END
+                //pass
+                break;
+            case 18:   // SWITCH
+                //pass
+                break;
+            case 19:   // BAG
+                //pass
+                break;
+            
+            default:
+                set_text(
+                    encounter_text, 
+                    ENCOUNTER_TEXT_LENGTH, 
+                    (char*)"WHAT WILL YOU DECIDE?"
+                );
+                break;
+        }
+    } else {
+        // For first few frames, set text to be blank --> This prevents skipped stages flashing their text
+        set_text(
+            encounter_text, 
+            1, 
+            (char*)""
+        );
     }
     reset_beam();
     set_text_size(-((uint8_t)(*box_height)>>4), (uint8_t)(*box_height)>>1);
@@ -485,6 +675,15 @@ void set_text(char *target_text, uint8_t text_length, char *reference_text) {
         if(i==text_length-1) {target_text[i] = '\0';}
     }
 }
+void set_text_subset(char *target_text, uint8_t start_index, uint8_t end_index, char *reference_text) {
+    /*
+    * NOTE; For encounter_text, DO NOT go beyond its maximum length
+    */
+    for(uint8_t i=start_index; i<end_index; i++) {
+        target_text[i] = reference_text[i-start_index];
+        // if(i==end_index-1) {target_text[i] = '\0';}
+    }
+}
 
 void display_hovered_star(int8_t origin_y, int8_t origin_x, uint8_t radius, uint8_t phase) {
     int8_t base_vector_dots[8] = {
@@ -501,4 +700,21 @@ void display_hovered_star(int8_t origin_y, int8_t origin_x, uint8_t radius, uint
     dot(rotated_vector_dots[2*i], rotated_vector_dots[2*i +1]);
     }
     // dots(..., rotated_vector_dots);  // ### Creates a ghost dot offset from others when called here, not sure why ###
+}
+int8_t linear_to_oscil(uint8_t x) {
+  /*
+  . Converts x in [0, 256] to y in [-128, 128]
+  . Signal maps as follows;
+  Input : 0->64,   64->128,  128->192,  192->256
+  Output: 0->128, 128->0,     0->-128, -128->0
+  */
+  if(x<=64) {
+    return 2*x -1;      // -1 for smoothing -> flickers at exactly
+  } else if(x<=128) {
+    return 128-2*(x-64);
+  } else if(x<=192) {
+    return -2*(x-128);
+  } else {
+    return -128+2*(x-192);
+  }
 }
