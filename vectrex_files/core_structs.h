@@ -19,6 +19,9 @@ typedef struct {
 
     // const uint8_t evolution_level;  // Minimum level requirement for the poke to evolve (can only evolve into one other poke)
     // const poke_details_fixed* evolution_poke;   // Fixed details for the poke this poke will evolve into
+
+    const int8_t flat_sprite_vectors[100];
+    const uint8_t flat_sprite_vectors_length;   // *NOTE; This specifies the ACTUAL used length, the buffer may be slightly longer than this (optimally, as long as this)
 } poke_details_fixed;
 
 #endif

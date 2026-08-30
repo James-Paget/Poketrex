@@ -11,7 +11,8 @@
 void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *timer, uint8_t *t1);
 
 void display_poke_bars(uint8_t *yOffset, uint8_t *xOffset, poke_details_flexible *poke, uint8_t width);
-void display_poke_portrait(uint8_t width);
+void display_poke_portrait(uint8_t width, uint8_t is_charmander_temp);
+void display_flat_vectors(const int8_t *flat_vectors, uint16_t flat_vector_length);
 void display_battle_box(int8_t *box_height, uint8_t *staging, uint8_t *timer, uint8_t *hovered_index);
 
 void display_battle_text(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *friendly_active_action, uint8_t *enemy_active_action, const uint8_t *poke_vertical_offset, int8_t *box_height, const uint8_t *width, uint8_t *staging, uint8_t *stage_timer, char *encounter_text);

@@ -7,6 +7,8 @@
 
 #include "poke_fixed_catalogue.h"
 
+#include "display_roam.h"
+#include "calculate_roam.h"
 #include "display_combat.h"
 #include "calculate_combat.h"
 
@@ -104,7 +106,7 @@ int main() {
     5 = Bag select screen (IN combat)
   */
   // Global variables
-  uint8_t screen_mode = 1;        // Which type of screen to display and calculate for
+  uint8_t screen_mode = 0;        // Which type of screen to display and calculate for
 
   uint8_t timer = 0;  // Ticks throughout the entire program - Used for animations
 
@@ -141,10 +143,7 @@ int main() {
     // Display & Calculation
     switch(screen_mode) {
       case 0:
-        // ######
-        // ### FOR NOW, JUST IMPLMENT THIS IS A SCREEN WHERE A KEY PRESS GENERATED NEW ENCOUNTER AND TRIGGERS ALL COMBAT START CONDITIONS
-        // ######
-        //pass
+        process_roam_screen( &screen_mode, &(enemy_poke_party[0]) );
         break;
       case 1:
         process_combat_screen( &screen_mode, &(friendly_poke_party[0]), &(enemy_poke_party[0]), &staging, &stage_timer, &stage_speed, &friendly_active_action, &enemy_active_action, &friendly_active_poke_index, &enemy_active_poke_index, &poke_first_counter, &poke_second_counter, &poke_first_counter_type, &poke_second_counter_type, &is_critical, &is_miss, &timer, &t1 );
@@ -158,6 +157,14 @@ int main() {
   }
   return 0;
 };
+
+void process_roam_screen(uint8_t *screen_mode, poke_details_flexible *enemy_poke_party) {
+  /*
+  */
+  // Display and calculate for this screen
+  display_roam_screen();
+  calculate_roam_screen(screen_mode, enemy_poke_party);
+}
 
 void process_combat_screen(uint8_t *screen_mode, poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *staging, uint8_t *stage_timer, uint8_t *stage_speed, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, int8_t *poke_first_counter, int8_t *poke_second_counter, uint8_t *poke_first_counter_type, uint8_t *poke_second_counter_type, uint8_t *is_critical, uint8_t *is_miss, uint8_t *timer, uint8_t *t1) {
   /*

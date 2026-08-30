@@ -41,12 +41,12 @@ int backgroundColor = 255;
 
 // Setup
 void setup() {
-    creationMode = "AUTO_DOTS"; //MANUAL
+    creationMode = "MANUAL"; //AUTO_DOTS
     size(800, 800);
     background(backgroundColor);
 
     try {
-        referenceImage = loadImage("referenceImage.png");
+        referenceImage = loadImage("pokemon_starly_sprite.png");  // referenceImage pokemon_charmander_sprite, pokemon_starly_sprite
         referenceDim = new PVector(referenceImage.width, referenceImage.height);
     } catch(Exception e) {
         println("Invalid reference image; expecting file of format 'referenceImage.png' in /data folder");
@@ -276,7 +276,8 @@ void printVectorArrayOuputs() {
     output.println("const int8_t vectors_array["+str(int(2*vectorNodes.size()))+"] = {");
     if(vectorNodes.size() > 1) {    // If you have at least 1 vector (e.g. 2 points -> doesn't account for skips at this minimum; *Be Careful*)
         for(int i=1; i<vectorNodes.size(); i++) {
-            output.println( "  "+str(int( (vectorNodes.get(i).x-vectorNodes.get(i-1).x)*vectrexScaleFactor*personalScaleFactor ))+", "+str(-int( (vectorNodes.get(i).y-vectorNodes.get(i-1).y)*vectrexScaleFactor*personalScaleFactor ))+", " );
+            //output.println( "  "+str(int( (vectorNodes.get(i).x-vectorNodes.get(i-1).x)*vectrexScaleFactor*personalScaleFactor ))+", "+str(-int( (vectorNodes.get(i).y-vectorNodes.get(i-1).y)*vectrexScaleFactor*personalScaleFactor ))+", " );
+            output.println( "  "+str(-int( (vectorNodes.get(i).y-vectorNodes.get(i-1).y)*vectrexScaleFactor*personalScaleFactor ))+", "+str(int( (vectorNodes.get(i).x-vectorNodes.get(i-1).x)*vectrexScaleFactor*personalScaleFactor ))+", " );
         }
     }
     output.println("};");

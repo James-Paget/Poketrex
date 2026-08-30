@@ -11,24 +11,22 @@
 #include "display_combat.h"
 
 /*
+------------
+POKE SPRITES
+------------
+*/
+
+
+/*
 -------------
 BATTLE_ASSETS
 -------------
 . Holds all functions related the vector display within the battle mode
 
-
-    // #####################
-    // #####################
-    // #####################
-    // #####################
-    reset_beam(); /// <--- very very slow when repeated
-
+Optimisations;
     Brightness slows program too
-
     Can manually lower refresh rate too
-
     Smarter asset linking
-
     CAN draw every other frame for low detail aspects, etc
 */
 
@@ -68,27 +66,32 @@ void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
             reset_beam();
             set_scale(128); // 128 used a standard scale here <-- Lower may improve performance?
             intensity(0x4f);
-            move(poke_vertical_offset, 0);        // Position the info slightly higher up the screen to give room for text below
-            move(0, -120);
-            // move(linear_to_oscil(*timer)>>4, 0);
-            display_poke_bars(0,0, &(friendly_poke_party[*friendly_active_poke_index]), poke_width );
-            move(linear_to_oscil(*timer)>>4, 0);
-            display_poke_portrait(poke_width);
+            if(*timer%2==0) {    // Draw pokes on evens
+                move(poke_vertical_offset, 0);        // Position the info slightly higher up the screen to give room for text below
+                move(0, -120);
+                // move(linear_to_oscil(*timer)>>4, 0);
+                display_poke_bars(0,0, &(friendly_poke_party[*friendly_active_poke_index]), poke_width );
+                move(linear_to_oscil(*timer)>>4, 0);
+                // display_poke_portrait(poke_width, 1);
+                display_flat_vectors(friendly_poke_party[*friendly_active_poke_index].fixed_details->flat_sprite_vectors, friendly_poke_party[*friendly_active_poke_index].fixed_details->flat_sprite_vectors_length);
 
-            // move(-linear_to_oscil(*timer)>>4, 0);
-            // move(poke_vertical_offset, 120);        // Back to origin + vertical offset
-            // move(0, 120-poke_width);    // Enough ahead so edge of poke_width is at far right (120~128)
-            reset_beam();   // Need to go back to origin to re-align anyway, so might as well reset_beam()
-            move(2*poke_vertical_offset, 120-poke_width);
-            display_poke_bars(0,0, &(enemy_poke_party[*enemy_active_poke_index]), poke_width );
-            move(linear_to_oscil(64+*timer)>>4, 0);
-            display_poke_portrait(poke_width);
+                // move(-linear_to_oscil(*timer)>>4, 0);
+                // move(poke_vertical_offset, 120);        // Back to origin + vertical offset
+                // move(0, 120-poke_width);    // Enough ahead so edge of poke_width is at far right (120~128)
+                reset_beam();   // Need to go back to origin to re-align anyway, so might as well reset_beam()
+                move(2*poke_vertical_offset, 120-poke_width);
+                display_poke_bars(0,0, &(enemy_poke_party[*enemy_active_poke_index]), poke_width );
+                move(linear_to_oscil(64+*timer)>>4, 0);
+                // display_poke_portrait(poke_width, 0);
+                display_flat_vectors(enemy_poke_party[*enemy_active_poke_index].fixed_details->flat_sprite_vectors, enemy_poke_party[*enemy_active_poke_index].fixed_details->flat_sprite_vectors_length);
+            }
+            if(*timer%2==1) {    // Draw text + BB on odds
+                // reset_beam();
+                display_battle_box(&text_box_height, staging, timer, t1);
 
-            reset_beam();
-            display_battle_box(&text_box_height, staging, timer, t1);
-
-            reset_beam();
-            display_battle_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, friendly_active_action, enemy_active_action, &poke_vertical_offset, &text_box_height, &poke_width, staging, stage_timer, encounter_text);
+                reset_beam();
+                display_battle_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, friendly_active_action, enemy_active_action, &poke_vertical_offset, &text_box_height, &poke_width, staging, stage_timer, encounter_text);
+            }
     }
 
     // ###
@@ -150,7 +153,7 @@ void display_poke_bars(uint8_t *yOffset, uint8_t *xOffset, poke_details_flexible
     // print_str_c(0,0, (char*)("TEST"));
 }
 
-void display_poke_portrait(uint8_t width) {
+void display_poke_portrait(uint8_t width, uint8_t is_charmander_temp) {
     /*
     . Displays the poke starting from the top-left corner
     */
@@ -162,6 +165,66 @@ void display_poke_portrait(uint8_t width) {
     };
     intensity(0x4f);
     lines(4, vector_lines);
+}
+
+void display_flat_vectors(const int8_t *flat_vectors, uint16_t flat_vector_length) {
+    /*
+    ###
+    ### SHOULD ADD A SCALE ARGUEMENT /256 HERE TO CHANGE VECTOR SIZES MORE EASILY
+    ###
+    . Displays a given 'flat-vector' list, which is a list as follows;
+        {spacing, originY, originX          <-- Only first 3 terms, not repeating
+        x1, i1, x2, i2, ..., xn, in, snake_offset, 0, 
+        x1, i1, x2, i2, ..., xm, im, snake_offset, 0, 
+        ...}
+        . spacing = Distance betwen adjacent lines/planes
+        . originY/X = Distance from top left corner to first vector start point
+        . 0 marks a new line is about to be started
+        . snake_offset = Offset in X direction (y offset always is spacing)
+        . x...= X offset for this vector (from current beam position, move by xn)
+        . i...= Intensity of the line to be drawn
+    . flat_vector_length = Number of terms in this flat vector full-list
+    . Starts from top left corner
+    . This method of storage reduces space taken up by this shaded image
+    . Vectors stored so the beam 'snakes' around for speed improvement e.g.
+            --->--\/
+            \/-<----
+            --->----
+            ...
+    . Intensity on scale 1-8 (NOT 0-7 to avoid 0 being used for situations other than line end) => 1==NO Beam Intensity, 8==MAX Beam Intensity
+    */
+    const uint8_t spacing = flat_vectors[0];
+    move(flat_vectors[1], flat_vectors[2]);
+    for(uint16_t i=4; i<flat_vector_length; i+=2) {
+        if(flat_vectors[i]==0) {    // Marks the end of a line => Move to new position
+            move(spacing, flat_vectors[i-1]);   // <-- Move down + snake offset
+        } else {        // For standard operation...
+            switch(flat_vectors[i]) {
+                case 2:
+                    intensity(0x2f);
+                    break;
+                case 3:
+                    intensity(0x3f);
+                    break;
+                case 4:
+                    intensity(0x4f);
+                    break;
+                case 5:
+                    intensity(0x5f);
+                    break;
+                case 6:
+                    intensity(0x6f);
+                    break;
+                case 7:
+                    intensity(0x7f);
+                    break;
+                default:
+                    intensity(0x0f);
+                    break;
+            }
+            line(0, flat_vectors[i-1]);
+        }
+    }
 }
 
 void display_battle_box(int8_t *box_height, uint8_t *staging, uint8_t *timer, uint8_t *hovered_index) {
@@ -176,7 +239,7 @@ void display_battle_box(int8_t *box_height, uint8_t *staging, uint8_t *timer, ui
             *box_height, 0,
             0, *box_height,
         };
-        move(-120, (int8_t)(120- *box_height)); // Move to centre-bottom of screen (assumes a beam_reset() before this)
+        move(-120, (int8_t)(120- ( (*box_height) + (*box_height>>2) ))); // Move to centre-bottom of screen (assumes a beam_reset() before this)
         intensity(0x2f);
         lines(2, vector_lines);
 
@@ -187,8 +250,8 @@ void display_battle_box(int8_t *box_height, uint8_t *staging, uint8_t *timer, ui
         int8_t yFactor = (*hovered_index<=1) ? 1 : -1;
         display_hovered_star(
             -120 +(*box_height>>1) +(*box_height>>2)*(yFactor), 
-            // 120 -(*box_height>>1) +(*box_height>>2)*((*hovered_index%2)*2 -1),  //-1, 1, -1, 1
-            120 -(*box_height>>1) +(*box_height>>1)*(*hovered_index%2),  //-1, 1, -1, 1
+            120 -(*box_height>>1) +((*box_height>>1) + (*box_height>>3))*((*hovered_index%2)*2 -1),  //-1, 1, -1, 1
+            // 120 -(*box_height>>1) +(*box_height>>1)*(*hovered_index%2),  //-1, 1, -1, 1
             3, 
             *timer
         );
@@ -225,16 +288,6 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
     /*
     . Displays the text for the combat description, E.g; XXX WAS SUPER EFFECTIVE!
     . Shown in the bottom left corner
-
-
-    ######
-    ######
-    ### (1) Complete text here
-    ### (2) Reset encounters + ensure EXP working correctly
-    ### (3) Basic poke sprites
-    ### (4) Basic switch interface?
-    ######
-    ######
     */
     if(*stage_timer > 5) {
         switch(*staging) {
