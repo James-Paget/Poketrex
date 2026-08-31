@@ -46,10 +46,10 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
     // Work through stages
     switch(*staging) {
         case 0:     // Select action broad
-            calculate_combat_buttons_actionSelection(t1, staging);
+            calculate_combat_buttons_actionSelection(screen_mode, t1, staging);
             break;
         case 1:     // Select move action
-            calculate_combat_buttons_moveSelection(friendly_poke_party, friendly_active_action, friendly_active_poke_index, t1, staging);
+            calculate_combat_buttons_moveSelection(friendly_poke_party, enemy_poke_party, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, t1, staging);
             break;
         case 2:     // Poke switch selection
             break;
@@ -359,7 +359,7 @@ void calculate_combat_screen(uint8_t *screen_mode, poke_details_flexible *friend
     // print_str_c(-50, -75, value_buffer);
 }
 
-void calculate_combat_buttons_actionSelection(uint8_t *friendly_hovered_action, uint8_t *staging) {
+void calculate_combat_buttons_actionSelection(uint8_t *screen_mode, uint8_t *friendly_hovered_action, uint8_t *staging) {
     /*
     . Buttons to control broad action selection
     . Move Vs PokeSwitch Vs Bag Vs Run
@@ -384,10 +384,14 @@ void calculate_combat_buttons_actionSelection(uint8_t *friendly_hovered_action, 
                 *friendly_hovered_action = 0;
                 break;
             case 1:     // Poke
+                // *enemy_active_index = (uint8_t)(rand() % 4);
                 break;
             case 2:     // Bag
                 break;
             case 3:     // Run
+                *staging = 0;
+                *friendly_hovered_action = 0;
+                *screen_mode = 0;
                 break;
         }
 
@@ -396,7 +400,7 @@ void calculate_combat_buttons_actionSelection(uint8_t *friendly_hovered_action, 
         set_scale(128);
     }
 }
-void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke_party, uint8_t *friendly_active_action, uint8_t *friendly_active_poke_index, uint8_t *friendly_hovered_move, uint8_t *staging) {
+void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke_party, poke_details_flexible *enemy_poke_party, uint8_t *friendly_active_action, uint8_t *enemy_active_action, uint8_t *friendly_active_poke_index, uint8_t *enemy_active_poke_index, uint8_t *friendly_hovered_move, uint8_t *staging) {
     /*
     . Buttons to control specific move action selection
     . Moves 1-4 selection
@@ -417,7 +421,9 @@ void calculate_combat_buttons_moveSelection(poke_details_flexible *friendly_poke
     if(buttons & JOY1_BTN2_MASK) {              // Select option
         if( (0 <= *friendly_active_poke_index) && (*friendly_active_poke_index < POKE_PARTY_LENGTH) ) {     // If is a valid poke
             if(POKE_MOVE_CATALOGUE[ friendly_poke_party[*friendly_active_poke_index].moves[*friendly_hovered_move] ].type != 0) {    // If is a non-null move
-                *friendly_active_action = *friendly_hovered_move +1;    // Select move
+                *friendly_active_action = *friendly_hovered_move +1;    // Select friendly move
+                select_random_poke_move_action(enemy_poke_party, enemy_active_poke_index, enemy_active_action);    // Select enemy move
+
                 *friendly_hovered_move = 0;                             // Reset the temporary hover variable
                 *staging = 4;                                           // Move staging
             }
@@ -591,4 +597,22 @@ uint8_t sum_fainted_poke(poke_details_flexible *poke_party) {
         if(poke_party[i].HP <= 0) {fainted_number+=1;}
     }
     return fainted_number;
+}
+
+void select_random_poke_move_action(poke_details_flexible *poke_party, uint8_t *active_poke_index, uint8_t *active_action) {
+    /*
+    . Considers a poke party and active poke, then selects a random VIABLE move from that poke and sets it in the buffer 'active_action'
+    . Used primarily for selecting the enemy poke's action in combat
+        - Can modify this to more cleverly choose a move, rather than a purely random approach
+    */
+    uint8_t viable_move_indices[4] = {4,4,4,4};  // Lists the index of the viable moves seen (*NOTE: 4 Used as a placeholder for NO VIABLE MOVE found; should be in range [0,3])
+    uint8_t viable_move_number = 0; // Keeps track of number of viable moves found
+    for(uint8_t i=0; i<4; i++) {
+        if(poke_party[*active_poke_index].moves[i] > 0) {   // If is a viable move, count it
+            viable_move_indices[viable_move_number] = i;
+            viable_move_number = viable_move_number+1;
+        }
+    }
+    uint8_t random_roll = (uint8_t)(rand() % viable_move_number);
+    *active_action = viable_move_indices[random_roll] +1;    // *NOTE; +1 since the actions start from 1, up to 4 (0 left as unchosen/unassigned action)
 }

@@ -188,3 +188,14 @@ void process_combat_screen(uint8_t *screen_mode, poke_details_flexible *friendly
   display_combat_screen(friendly_poke_party, enemy_poke_party, staging, stage_timer, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, timer, t1);
   calculate_combat_screen(screen_mode, friendly_poke_party, enemy_poke_party, staging, stage_timer, stage_speed, friendly_active_action, enemy_active_action, friendly_active_poke_index, enemy_active_poke_index, poke_first_counter, poke_second_counter, poke_first_counter_type, poke_second_counter_type, is_critical, is_miss, timer, t1);
 }
+
+
+// ###
+// ###X(1) Fix first/second issue
+// ###X(2) Auto select enemy move in calc start -> AFTER YOU ISSUE YOUR MOVE COMMAND
+// ### (3) Do type chart array for correct type effectiveness
+// ### (4) Have wild encounters choose from a couple different pokes
+// ### (5) Evolution calcs needed
+// ### (6) Roam screen
+// ### (7) Use actual dmg calcs (LOW-PRIO ISSUE)
+// ###

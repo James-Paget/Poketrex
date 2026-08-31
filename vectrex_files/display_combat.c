@@ -92,6 +92,16 @@ void display_combat_screen(poke_details_flexible *friendly_poke_party, poke_deta
                 reset_beam();
                 display_battle_text(friendly_poke_party, enemy_poke_party, friendly_active_poke_index, enemy_active_poke_index, friendly_active_action, enemy_active_action, &poke_vertical_offset, &text_box_height, &poke_width, staging, stage_timer, encounter_text);
             }
+            reset_beam();
+
+
+            // BUG-FIXING
+            // char value_buffer[4];
+            // value_buffer[0] = '0';
+            // value_buffer[1] = '0'+((*enemy_active_action) /10);
+            // value_buffer[2] = '0'+((*enemy_active_action) %10);
+            // value_buffer[3] = '\0';
+            // print_str_c(0, 0, value_buffer);
     }
 
     // ###
@@ -289,6 +299,23 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
     . Displays the text for the combat description, E.g; XXX WAS SUPER EFFECTIVE!
     . Shown in the bottom left corner
     */
+    // Determine first/second poke from friendly/enemy
+    poke_details_flexible *poke_first;  // Left floating for now, assigned immdiately after
+    poke_details_flexible *poke_second;  // "" ""
+    uint8_t poke_first_active_action;
+    uint8_t poke_second_active_action;
+    if(friendly_poke_party[*friendly_active_poke_index].SPD >= enemy_poke_party[*enemy_active_poke_index].SPD) {
+        poke_first  = &(friendly_poke_party[*friendly_active_poke_index]);
+        poke_second = &(enemy_poke_party[*enemy_active_poke_index]);
+        poke_first_active_action  = *friendly_active_action;
+        poke_second_active_action = *enemy_active_action;
+    } else {
+        poke_first  = &(enemy_poke_party[*enemy_active_poke_index]);
+        poke_second = &(friendly_poke_party[*friendly_active_poke_index]);
+        poke_first_active_action  = *enemy_active_action;
+        poke_second_active_action = *friendly_active_action;
+    }
+
     if(*stage_timer > 5) {
         switch(*staging) {
             case 4+0:
@@ -317,17 +344,17 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
                     encounter_text,
                     0,
                     POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
-                    (char*)(friendly_poke_party[*friendly_active_poke_index].fixed_details->name)
+                    (char*)(poke_first->fixed_details->name)
                 );
                 set_text_subset(
                     encounter_text,
                     POKE_NAME_LENGTH+6,
                     POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
-                    (char*)(POKE_MOVE_CATALOGUE[friendly_poke_party[*friendly_active_poke_index].moves[*friendly_active_action-1]].name)
+                    (char*)(POKE_MOVE_CATALOGUE[poke_first->moves[poke_first_active_action-1]].name)
                 );
                 break;
             case 4+2:
-                switch(GET_EFFECTIVENESS(enemy_poke_party[*enemy_active_poke_index].fixed_details->types, &POKE_MOVE_CATALOGUE[friendly_poke_party[*friendly_active_poke_index].moves[*friendly_active_action-1]])) {
+                switch(GET_EFFECTIVENESS(poke_second->fixed_details->types, &POKE_MOVE_CATALOGUE[poke_first->moves[poke_first_active_action-1]])) {
                     case 0:     // No effect
                         set_text(
                             encounter_text,
@@ -365,9 +392,6 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
                         break;
                 }
                 break;
-            // ###
-            // ### MAY HAVE TO NOT DISPLAY UNTIL A COUPLE FRAMES AFTER TO DODGE A SLIGHT DISPLAY OF THE MSG
-            // ###
             case 4+3:
                 // *NOTE; Will be skipped if non-critical
                 set_text(
@@ -403,19 +427,19 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
                 set_text_subset(
                     encounter_text,
                     0,
-                    POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
-                    (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name)
+                    POKE_NAME_LENGTH-1,     // *NOTE; -1 to remove the \0 on the last character of name
+                    (char*)(poke_second->fixed_details->name)
                 );
                 set_text_subset(
                     encounter_text,
                     POKE_NAME_LENGTH+6,
                     POKE_NAME_LENGTH+6+POKE_MOVE_NAME_LENGTH +1,
-                    // (char*)(POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[*enemy_active_action-1]].name)
-                    (char*)(POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[0]].name)
+                    (char*)(POKE_MOVE_CATALOGUE[poke_second->moves[poke_second_active_action-1]].name)
+                    // (char*)(POKE_MOVE_CATALOGUE[poke_second->moves[0]].name)    // ### TEMPORARY -> JUST WHILE MOVES ARE NOT BEING AUTO SELECTED ###
                 );
                 break;
             case 4+7:
-                switch(GET_EFFECTIVENESS(friendly_poke_party[*friendly_active_poke_index].fixed_details->types, &POKE_MOVE_CATALOGUE[enemy_poke_party[*enemy_active_poke_index].moves[*enemy_active_action-1]])) {
+                switch(GET_EFFECTIVENESS(poke_first->fixed_details->types, &POKE_MOVE_CATALOGUE[poke_second->moves[poke_second_active_action-1]])) {
                     case 0:     // No effect
                         set_text(
                             encounter_text,
@@ -484,7 +508,7 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
                     set_text_subset(
                         encounter_text,
                         0,
-                        POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                        POKE_NAME_LENGTH-1,     // *NOTE; -1 to remove the \0 on the last character
                         (char*)(friendly_poke_party[*friendly_active_poke_index].fixed_details->name)
                     );
                 }
@@ -497,7 +521,7 @@ void display_encounter_text(poke_details_flexible *friendly_poke_party, poke_det
                     set_text_subset(
                         encounter_text,
                         0,
-                        POKE_NAME_LENGTH-1,     // *NOTE; -1 ro remove the \0 on the last character
+                        POKE_NAME_LENGTH-1,     // *NOTE; -1 to remove the \0 on the last character
                         (char*)(enemy_poke_party[*enemy_active_poke_index].fixed_details->name)
                     );
                 }
